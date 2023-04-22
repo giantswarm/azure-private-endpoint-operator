@@ -90,7 +90,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.25.9 // indirect
 	k8s.io/apiextensions-apiserver v0.25.2 // indirect
-	k8s.io/component-base v0.25.2 // indirect
+	k8s.io/component-base v0.25.9 // indirect
 	k8s.io/klog/v2 v2.80.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20220803164354-a70c9af30aea // indirect
 	k8s.io/utils v0.0.0-20220823124924-e9cbc92d1a73 // indirect
@@ -100,4 +100,9 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace sigs.k8s.io/cluster-api-provider-azure => github.com/giantswarm/cluster-api-provider-azure v1.9.0-gs.alpha.13
+replace (
+	helm.sh/helm/v3 v3.10.3 => helm.sh/helm/v3 v3.11.3
+	k8s.io/apiextensions-apiserver v0.25.2 => k8s.io/apiextensions-apiserver v0.25.9
+	k8s.io/component-base v0.25.2 => k8s.io/component-base v0.25.9
+	sigs.k8s.io/cluster-api-provider-azure => github.com/giantswarm/cluster-api-provider-azure v1.9.0-gs.alpha.13
+)

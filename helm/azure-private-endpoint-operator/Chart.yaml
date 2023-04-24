@@ -14,4 +14,4 @@ home: https://github.com/giantswarm/azure-private-endpoint-operator
 # icon: https://s.giantswarm.io/app-icons/example/1/light.svg
 annotations:
   application.giantswarm.io/team: clippy
-  config.giantswarm.io/version: 1.x.x
+  config.giantswarm.io/version: "add-azure-private-endpoint-operator"

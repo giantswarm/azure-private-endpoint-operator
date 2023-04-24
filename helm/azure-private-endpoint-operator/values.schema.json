@@ -19,6 +19,17 @@
                 }
             }
         },
+        "managementCluster": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                }
+            }
+        },
         "name": {
             "type": "string"
         },

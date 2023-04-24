@@ -33,6 +33,8 @@ spec:
         - /manager
         args:
         - --leader-elect
+        - --management-cluster-name "{{ .Values.managementCluster.name }}"
+        - --management-cluster-namespace "{{ .Values.managementCluster.namespace }}"
         livenessProbe:
           httpGet:
             path: /healthz

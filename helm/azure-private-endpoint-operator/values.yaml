@@ -26,3 +26,7 @@ podSecurityContext:
 securityContext:
   seccompProfile:
     type: RuntimeDefault
+
+managementCluster:
+  name: PLACEHOLDER
+  namespace: org-giantswarm

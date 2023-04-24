@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/giantswarm/microerror"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cluster-api-provider-azure/util/slice"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -37,8 +36,24 @@ import (
 // AzureClusterReconciler reconciles a AzureCluster object
 type AzureClusterReconciler struct {
 	client.Client
-	Scheme                *runtime.Scheme
 	managementClusterName types.NamespacedName
+}
+
+func NewAzureClusterReconciler(client client.Client, managementClusterName types.NamespacedName) (*AzureClusterReconciler, error) {
+	if client == nil {
+		return nil, microerror.Maskf(errors.InvalidConfigError, "client must be set")
+	}
+	if managementClusterName.Name == "" {
+		return nil, microerror.Maskf(errors.InvalidConfigError, "%T.Name must be set", managementClusterName)
+	}
+	if managementClusterName.Namespace == "" {
+		return nil, microerror.Maskf(errors.InvalidConfigError, "%T.Namespace must be set", managementClusterName)
+	}
+
+	return &AzureClusterReconciler{
+		Client:                client,
+		managementClusterName: managementClusterName,
+	}, nil
 }
 
 //+kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io.giantswarm.io,resources=azureclusters,verbs=get;list;watch;create;update;patch;delete

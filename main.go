@@ -20,6 +20,7 @@ import (
 	"flag"
 	"os"
 
+	"k8s.io/apimachinery/pkg/types"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -52,11 +53,15 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var managementClusterName string
+	var managementClusterNamespace string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&managementClusterName, "management-cluster-name", "", "The name of the management cluster where this operator is running (also MC AzureCluster CR name)")
+	flag.StringVar(&managementClusterNamespace, "management-cluster-namespace", "", "The namespace where the management cluster AzureCluster CR is deployed")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -89,10 +94,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.AzureClusterReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	azureClusterReconciler, err := controllers.NewAzureClusterReconciler(mgr.GetClient(), types.NamespacedName{
+		Namespace: managementClusterNamespace,
+		Name:      managementClusterName,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to create new AzureClusterReconciler")
+		os.Exit(1)
+	}
+
+	if err = azureClusterReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AzureCluster")
 		os.Exit(1)
 	}

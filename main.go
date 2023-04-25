@@ -20,6 +20,7 @@ import (
 	"flag"
 	"os"
 
+	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/types"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -64,6 +65,7 @@ func main() {
 	flag.StringVar(&managementClusterNamespace, "management-cluster-namespace", "", "The namespace where the management cluster AzureCluster CR is deployed")
 	opts := zap.Options{
 		Development: true,
+		TimeEncoder: zapcore.ISO8601TimeEncoder,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()

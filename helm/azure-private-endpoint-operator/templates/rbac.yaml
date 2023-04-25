@@ -6,7 +6,7 @@ metadata:
   {{- include "labels.common" . | nindent 4 }}
 rules:
 - apiGroups:
-  - infrastructure.cluster.x-k8s.io.giantswarm.io
+  - infrastructure.cluster.x-k8s.io
   resources:
   - azureclusters
   - azureclusters/status

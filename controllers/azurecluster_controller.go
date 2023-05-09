@@ -23,12 +23,11 @@ import (
 
 	"github.com/giantswarm/microerror"
 	"k8s.io/apimachinery/pkg/types"
+	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/util/slice"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 )
@@ -120,6 +119,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}()
 
+	// <start> moved to management cluster scope
 	var mcNodeSubnet *capz.SubnetSpec
 	for i := range managementCluster.Spec.NetworkSpec.Subnets {
 		subnet := &managementCluster.Spec.NetworkSpec.Subnets[i]
@@ -136,6 +136,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		logger.Info(fmt.Sprintf("Node subnet not found in management cluster %s, private endpoints will not be added", managementCluster.Name))
 		return ctrl.Result{}, nil
 	}
+	// <end>
 
 	//
 	// Add new private endpoint

@@ -21,7 +21,7 @@ type ManagementClusterScope interface {
 	GetPrivateEndpointsToWorkloadCluster(workloadClusterSubscriptionID, workloadClusterResourceGroup string) []capz.PrivateEndpointSpec
 	ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec) bool
 	AddPrivateEndpointSpec(capz.PrivateEndpointSpec)
-	RemovePrivateEndpoint(capz.PrivateEndpointSpec)
+	RemovePrivateEndpointByName(string)
 }
 
 func NewManagementClusterScope(_ context.Context, managementCluster *capz.AzureCluster) (ManagementClusterScope, error) {
@@ -101,9 +101,9 @@ func (s managementClusterScope) AddPrivateEndpointSpec(spec capz.PrivateEndpoint
 	}
 }
 
-func (s managementClusterScope) RemovePrivateEndpoint(privateEndpoint capz.PrivateEndpointSpec) {
+func (s managementClusterScope) RemovePrivateEndpointByName(privateEndpointName string) {
 	for i := len(s.privateEndpoints) - 1; i >= 0; i-- {
-		if s.privateEndpoints[i].Name == privateEndpoint.Name {
+		if s.privateEndpoints[i].Name == privateEndpointName {
 			s.privateEndpoints = append(
 				s.privateEndpoints[:i],
 				s.privateEndpoints[i+1:]...)

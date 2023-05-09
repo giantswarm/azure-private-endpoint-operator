@@ -93,8 +93,28 @@ func (s *Service) Reconcile(_ context.Context) error {
 			}
 		}
 		if !privateEndpointIsUsed {
-			s.ManagementClusterScope.RemovePrivateEndpoint(privateEndpoint)
+			s.ManagementClusterScope.RemovePrivateEndpointByName(privateEndpoint.Name)
 		}
+	}
+
+	return nil
+}
+
+func (s *Service) Delete(_ context.Context) error {
+	//
+	// First get all workload cluster private links. We will delete private endpoints for all of
+	// them.
+	//
+	privateLinks, err := s.WorkloadClusterScope.GetPrivateLinks(
+		s.ManagementClusterScope.GetName().Name,
+		s.ManagementClusterScope.GetSubscriptionID())
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	for _, privateLink := range privateLinks {
+		privateEndpointName := fmt.Sprintf("%s-privateendpoint", privateLink.Name)
+		s.ManagementClusterScope.RemovePrivateEndpointByName(privateEndpointName)
 	}
 
 	return nil

@@ -65,7 +65,7 @@ type managementClusterScope struct {
 	privateEndpoints []capz.PrivateEndpointSpec
 }
 
-func (s managementClusterScope) GetPrivateEndpointsToWorkloadCluster(workloadClusterSubscriptionID, workloadClusterResourceGroup string) []capz.PrivateEndpointSpec {
+func (s *managementClusterScope) GetPrivateEndpointsToWorkloadCluster(workloadClusterSubscriptionID, workloadClusterResourceGroup string) []capz.PrivateEndpointSpec {
 	workloadClusterSubscriptionIDPrefix := fmt.Sprintf(
 		"/subscriptions/%s/resourceGroups/%s",
 		workloadClusterSubscriptionID,
@@ -87,21 +87,21 @@ func (s managementClusterScope) GetPrivateEndpointsToWorkloadCluster(workloadClu
 	return privateEndpointsToWorkloadCluster
 }
 
-func (s managementClusterScope) ContainsPrivateEndpointSpec(privateEndpoint capz.PrivateEndpointSpec) bool {
+func (s *managementClusterScope) ContainsPrivateEndpointSpec(privateEndpoint capz.PrivateEndpointSpec) bool {
 	return sliceContains(s.privateEndpoints, privateEndpoint, arePrivateEndpointsEqual)
 }
 
-func (s managementClusterScope) GetPrivateEndpoints() []capz.PrivateEndpointSpec {
+func (s *managementClusterScope) GetPrivateEndpoints() []capz.PrivateEndpointSpec {
 	return s.privateEndpoints
 }
 
-func (s managementClusterScope) AddPrivateEndpointSpec(spec capz.PrivateEndpointSpec) {
+func (s *managementClusterScope) AddPrivateEndpointSpec(spec capz.PrivateEndpointSpec) {
 	if !s.ContainsPrivateEndpointSpec(spec) {
 		s.privateEndpoints = append(s.privateEndpoints, spec)
 	}
 }
 
-func (s managementClusterScope) RemovePrivateEndpointByName(privateEndpointName string) {
+func (s *managementClusterScope) RemovePrivateEndpointByName(privateEndpointName string) {
 	for i := len(s.privateEndpoints) - 1; i >= 0; i-- {
 		if s.privateEndpoints[i].Name == privateEndpointName {
 			s.privateEndpoints = append(

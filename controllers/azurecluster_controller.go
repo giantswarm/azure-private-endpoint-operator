@@ -25,10 +25,15 @@ import (
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privateendpoints"
+)
+
+const (
+	AzureClusterControllerFinalizer string = "azure-private-endpoint-operator.giantswarm.io/azurecluster"
 )
 
 // AzureClusterReconciler reconciles a AzureCluster object
@@ -95,6 +100,8 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				workloadCluster.Spec.NetworkSpec.APIServerLB.Type)
 	}
 
+	controllerutil.AddFinalizer(&workloadCluster, AzureClusterControllerFinalizer)
+
 	var managementCluster capz.AzureCluster
 	err = r.Client.Get(ctx, r.managementClusterName, &managementCluster)
 	if err != nil {
@@ -124,10 +131,13 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	if workloadCluster.DeletionTimestamp == nil {
+	if workloadCluster.DeletionTimestamp.IsZero() {
 		err = service.Reconcile(ctx)
 	} else {
 		err = service.Delete(ctx)
+		if err == nil {
+			controllerutil.RemoveFinalizer(&workloadCluster, AzureClusterControllerFinalizer)
+		}
 	}
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)

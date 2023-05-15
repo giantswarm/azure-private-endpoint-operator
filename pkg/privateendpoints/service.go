@@ -101,10 +101,8 @@ func (s *Service) Reconcile(_ context.Context) error {
 }
 
 func (s *Service) Delete(_ context.Context) error {
-	//
 	// First get all workload cluster private links. We will delete private endpoints for all of
 	// them.
-	//
 	privateLinks, err := s.WorkloadClusterScope.GetPrivateLinks(
 		s.ManagementClusterScope.GetName().Name,
 		s.ManagementClusterScope.GetSubscriptionID())
@@ -112,6 +110,7 @@ func (s *Service) Delete(_ context.Context) error {
 		return microerror.Mask(err)
 	}
 
+	// For every private link, delete its corresponding private endpoint.
 	for _, privateLink := range privateLinks {
 		privateEndpointName := fmt.Sprintf("%s-privateendpoint", privateLink.Name)
 		s.ManagementClusterScope.RemovePrivateEndpointByName(privateEndpointName)

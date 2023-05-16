@@ -30,6 +30,7 @@ import (
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privateendpoints"
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privatelinks"
 )
 
 const (
@@ -108,33 +109,33 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	// TODO: implement patch in ManagementClusterScope and WorkloadClusterScope
+	// TODO: implement patch in ManagementClusterScope and scope
 
-	// Create workload cluster scope - we use this to get the info about the private workload
+	// Create WC private links scope - we use this to get the info about the private workload
 	// cluster private links, and then we make sure to have a private endpoints that connect to the
 	// private links.
-	workloadClusterScope, err := privateendpoints.NewWorkloadClusterScope(ctx, &workloadCluster)
+	privateLinksScope, err := privatelinks.NewScope(ctx, &workloadCluster)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	// Create management cluster scope - we use this to get the info about the management cluster
+	// Create MC private endpoints scope - we use this to get the info about the management cluster
 	// private endpoints and to update them.
-	managementClusterScope, err := privateendpoints.NewManagementClusterScope(ctx, &managementCluster)
+	privateEndpointsScope, err := privateendpoints.NewScope(ctx, &managementCluster)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
 	// Finally, reconcile private links to private endpoints
-	service, err := privateendpoints.NewService(managementClusterScope, workloadClusterScope)
+	privateEndpointsService, err := privateendpoints.NewService(privateEndpointsScope, privateLinksScope)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
 	if workloadCluster.DeletionTimestamp.IsZero() {
-		err = service.Reconcile(ctx)
+		err = privateEndpointsService.Reconcile(ctx)
 	} else {
-		err = service.Delete(ctx)
+		err = privateEndpointsService.Delete(ctx)
 		if err == nil {
 			controllerutil.RemoveFinalizer(&workloadCluster, AzureClusterControllerFinalizer)
 		}

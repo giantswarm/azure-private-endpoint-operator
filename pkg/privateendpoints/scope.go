@@ -6,25 +6,13 @@ import (
 	"strings"
 
 	"github.com/giantswarm/microerror"
-	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azurecluster"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 )
 
-type ManagementClusterScope interface {
-	GetName() types.NamespacedName
-	GetSubscriptionID() string
-	GetLocation() string
-	GetResourceGroup() string
-	GetPrivateEndpoints() []capz.PrivateEndpointSpec
-	GetPrivateEndpointsToWorkloadCluster(workloadClusterSubscriptionID, workloadClusterResourceGroup string) []capz.PrivateEndpointSpec
-	ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec) bool
-	AddPrivateEndpointSpec(capz.PrivateEndpointSpec)
-	RemovePrivateEndpointByName(string)
-}
-
-func NewManagementClusterScope(_ context.Context, managementCluster *capz.AzureCluster) (ManagementClusterScope, error) {
+func NewScope(_ context.Context, managementCluster *capz.AzureCluster) (Scope, error) {
 	if managementCluster == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "managementCluster must be set")
 	}
@@ -52,20 +40,20 @@ func NewManagementClusterScope(_ context.Context, managementCluster *capz.AzureC
 		privateEndpointsSubnet = &managementCluster.Spec.NetworkSpec.Subnets[0]
 	}
 
-	scope := managementClusterScope{
-		baseWorkloadClusterScope: newBaseWorkloadClusterScope(managementCluster),
-		privateEndpoints:         privateEndpointsSubnet.PrivateEndpoints,
+	privateEndpointsScope := scope{
+		BaseScope:        azurecluster.NewBaseScope(managementCluster),
+		privateEndpoints: privateEndpointsSubnet.PrivateEndpoints,
 	}
 
-	return &scope, nil
+	return &privateEndpointsScope, nil
 }
 
-type managementClusterScope struct {
-	baseWorkloadClusterScope
+type scope struct {
+	azurecluster.BaseScope
 	privateEndpoints []capz.PrivateEndpointSpec
 }
 
-func (s *managementClusterScope) GetPrivateEndpointsToWorkloadCluster(workloadClusterSubscriptionID, workloadClusterResourceGroup string) []capz.PrivateEndpointSpec {
+func (s *scope) GetPrivateEndpointsToWorkloadCluster(workloadClusterSubscriptionID, workloadClusterResourceGroup string) []capz.PrivateEndpointSpec {
 	workloadClusterSubscriptionIDPrefix := fmt.Sprintf(
 		"/subscriptions/%s/resourceGroups/%s",
 		workloadClusterSubscriptionID,
@@ -87,21 +75,21 @@ func (s *managementClusterScope) GetPrivateEndpointsToWorkloadCluster(workloadCl
 	return privateEndpointsToWorkloadCluster
 }
 
-func (s *managementClusterScope) ContainsPrivateEndpointSpec(privateEndpoint capz.PrivateEndpointSpec) bool {
+func (s *scope) ContainsPrivateEndpointSpec(privateEndpoint capz.PrivateEndpointSpec) bool {
 	return sliceContains(s.privateEndpoints, privateEndpoint, arePrivateEndpointsEqual)
 }
 
-func (s *managementClusterScope) GetPrivateEndpoints() []capz.PrivateEndpointSpec {
+func (s *scope) GetPrivateEndpoints() []capz.PrivateEndpointSpec {
 	return s.privateEndpoints
 }
 
-func (s *managementClusterScope) AddPrivateEndpointSpec(spec capz.PrivateEndpointSpec) {
+func (s *scope) AddPrivateEndpointSpec(spec capz.PrivateEndpointSpec) {
 	if !s.ContainsPrivateEndpointSpec(spec) {
 		s.privateEndpoints = append(s.privateEndpoints, spec)
 	}
 }
 
-func (s *managementClusterScope) RemovePrivateEndpointByName(privateEndpointName string) {
+func (s *scope) RemovePrivateEndpointByName(privateEndpointName string) {
 	for i := len(s.privateEndpoints) - 1; i >= 0; i-- {
 		if s.privateEndpoints[i].Name == privateEndpointName {
 			s.privateEndpoints = append(
@@ -114,4 +102,14 @@ func (s *managementClusterScope) RemovePrivateEndpointByName(privateEndpointName
 
 func arePrivateEndpointsEqual(a, b capz.PrivateEndpointSpec) bool {
 	return a.Name == b.Name
+}
+
+func sliceContains[T1, T2 any](items []T1, t T2, equal func(a T1, b T2) bool) bool {
+	for _, item := range items {
+		if equal(item, t) {
+			return true
+		}
+	}
+
+	return false
 }

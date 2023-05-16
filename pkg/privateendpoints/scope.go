@@ -7,12 +7,13 @@ import (
 
 	"github.com/giantswarm/microerror"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azurecluster"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 )
 
-func NewScope(_ context.Context, managementCluster *capz.AzureCluster) (Scope, error) {
+func NewScope(_ context.Context, managementCluster *capz.AzureCluster, client client.Client) (Scope, error) {
 	if managementCluster == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "managementCluster must be set")
 	}
@@ -40,8 +41,13 @@ func NewScope(_ context.Context, managementCluster *capz.AzureCluster) (Scope, e
 		privateEndpointsSubnet = &managementCluster.Spec.NetworkSpec.Subnets[0]
 	}
 
+	baseScope, err := azurecluster.NewBaseScope(managementCluster, client)
+	if err != nil {
+		return nil, microerror.Mask(err)
+	}
+
 	privateEndpointsScope := scope{
-		BaseScope:        azurecluster.NewBaseScope(managementCluster),
+		BaseScope:        *baseScope,
 		privateEndpoints: privateEndpointsSubnet.PrivateEndpoints,
 	}
 

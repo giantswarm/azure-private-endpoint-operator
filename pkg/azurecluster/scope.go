@@ -1,41 +1,63 @@
 package azurecluster
 
 import (
+	"context"
+
+	"github.com/giantswarm/microerror"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/patch"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type BaseScope struct {
-	name           types.NamespacedName
-	subscriptionID string
-	location       string
-	resourceGroup  string
+	azureCluster *capz.AzureCluster
+	patchHelper  *patch.Helper
 }
 
-func NewBaseScope(azureCluster *v1beta1.AzureCluster) BaseScope {
-	return BaseScope{
-		name: types.NamespacedName{
-			Namespace: azureCluster.Namespace,
-			Name:      azureCluster.Name,
-		},
-		subscriptionID: azureCluster.Spec.SubscriptionID,
-		location:       azureCluster.Spec.Location,
-		resourceGroup:  azureCluster.Spec.ResourceGroup,
+func NewBaseScope(azureCluster *capz.AzureCluster, client client.Client) (*BaseScope, error) {
+	patchHelper, err := patch.NewHelper(azureCluster, client)
+	if err != nil {
+		return nil, microerror.Mask(err)
 	}
+
+	return &BaseScope{
+		azureCluster: azureCluster,
+		patchHelper:  patchHelper,
+	}, nil
 }
 
 func (s *BaseScope) GetClusterName() types.NamespacedName {
-	return s.name
+	return types.NamespacedName{
+		Namespace: s.azureCluster.Namespace,
+		Name:      s.azureCluster.Name,
+	}
 }
 
 func (s *BaseScope) GetSubscriptionID() string {
-	return s.subscriptionID
+	return s.azureCluster.Spec.SubscriptionID
 }
 
 func (s *BaseScope) GetLocation() string {
-	return s.location
+	return s.azureCluster.Spec.Location
 }
 
 func (s *BaseScope) GetResourceGroup() string {
-	return s.resourceGroup
+	return s.azureCluster.Spec.ResourceGroup
+}
+
+func (s *BaseScope) PatchObject(ctx context.Context) error {
+	err := s.patchHelper.Patch(ctx, s.azureCluster)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+	return nil
+}
+
+func (s *BaseScope) Close(ctx context.Context) error {
+	err := s.PatchObject(ctx)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+	return nil
 }

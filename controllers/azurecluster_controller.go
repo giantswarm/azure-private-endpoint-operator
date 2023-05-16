@@ -101,30 +101,32 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				workloadCluster.Spec.NetworkSpec.APIServerLB.Type)
 	}
 
-	controllerutil.AddFinalizer(&workloadCluster, AzureClusterControllerFinalizer)
-
 	var managementCluster capz.AzureCluster
 	err = r.Client.Get(ctx, r.managementClusterName, &managementCluster)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	// TODO: implement patch in ManagementClusterScope and scope
-
 	// Create WC private links scope - we use this to get the info about the private workload
 	// cluster private links, and then we make sure to have a private endpoints that connect to the
 	// private links.
-	privateLinksScope, err := privatelinks.NewScope(ctx, &workloadCluster)
+	privateLinksScope, err := privatelinks.NewScope(ctx, &workloadCluster, r.Client)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
 	// Create MC private endpoints scope - we use this to get the info about the management cluster
 	// private endpoints and to update them.
-	privateEndpointsScope, err := privateendpoints.NewScope(ctx, &managementCluster)
+	privateEndpointsScope, err := privateendpoints.NewScope(ctx, &managementCluster, r.Client)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
+	// Always close the scope when exiting this function, so we can persist any MC AzureCluster changes.
+	defer func() {
+		if closeErr := privateEndpointsScope.Close(ctx); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	// Finally, reconcile private links to private endpoints
 	privateEndpointsService, err := privateendpoints.NewService(privateEndpointsScope, privateLinksScope)
@@ -133,6 +135,13 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if workloadCluster.DeletionTimestamp.IsZero() {
+		// reconcile normal
+		controllerutil.AddFinalizer(&workloadCluster, AzureClusterControllerFinalizer)
+		err = privateLinksScope.PatchObject(ctx)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+
 		err = privateEndpointsService.Reconcile(ctx)
 	} else {
 		err = privateEndpointsService.Delete(ctx)

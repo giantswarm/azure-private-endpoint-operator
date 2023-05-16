@@ -7,19 +7,25 @@ import (
 	"github.com/giantswarm/microerror"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/util/slice"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azurecluster"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privateendpoints"
 )
 
-func NewScope(_ context.Context, workloadCluster *capz.AzureCluster) (privateendpoints.PrivateLinksScope, error) {
+func NewScope(_ context.Context, workloadCluster *capz.AzureCluster, client client.Client) (privateendpoints.PrivateLinksScope, error) {
 	if workloadCluster == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "workloadCluster must be set")
 	}
 
+	baseScope, err := azurecluster.NewBaseScope(workloadCluster, client)
+	if err != nil {
+		return nil, microerror.Mask(err)
+	}
+
 	scope := Scope{
-		BaseScope:    azurecluster.NewBaseScope(workloadCluster),
+		BaseScope:    *baseScope,
 		privateLinks: workloadCluster.Spec.NetworkSpec.APIServerLB.PrivateLinks,
 	}
 

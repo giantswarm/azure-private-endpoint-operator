@@ -23,6 +23,8 @@ type Scope interface {
 	ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec) bool
 	AddPrivateEndpointSpec(capz.PrivateEndpointSpec)
 	RemovePrivateEndpointByName(string)
+	PatchObject(ctx context.Context) error
+	Close(ctx context.Context) error
 }
 
 // PrivateLinksScope is the interface for getting private links for which the private endpoints are needed.
@@ -33,6 +35,8 @@ type PrivateLinksScope interface {
 	GetResourceGroup() string
 	GetPrivateLinks(managementClusterName, managementClusterSubscriptionID string) ([]capz.PrivateLink, error)
 	LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLink, bool)
+	PatchObject(ctx context.Context) error
+	Close(ctx context.Context) error
 }
 
 type Service struct {

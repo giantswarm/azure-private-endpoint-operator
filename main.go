@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"time"
 
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/types"
@@ -51,18 +52,27 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	var managementClusterName string
-	var managementClusterNamespace string
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	var (
+		metricsAddr                string
+		enableLeaderElection       bool
+		probeAddr                  string
+		managementClusterName      string
+		managementClusterNamespace string
+		syncPeriod                 time.Duration
+	)
+	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080",
+		"The address the metric endpoint binds to.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081",
+		"The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&managementClusterName, "management-cluster-name", "", "The name of the management cluster where this operator is running (also MC AzureCluster CR name)")
-	flag.StringVar(&managementClusterNamespace, "management-cluster-namespace", "", "The namespace where the management cluster AzureCluster CR is deployed")
+	flag.StringVar(&managementClusterName, "management-cluster-name", "",
+		"The name of the management cluster where this operator is running (also MC AzureCluster CR name)")
+	flag.StringVar(&managementClusterNamespace, "management-cluster-namespace", "",
+		"The namespace where the management cluster AzureCluster CR is deployed")
+	flag.DurationVar(&syncPeriod, "sync-period", 5*time.Minute,
+		"The minimum interval at which watched resources are reconciled (e.g. 15m)")
 	opts := zap.Options{
 		Development: true,
 		TimeEncoder: zapcore.ISO8601TimeEncoder,
@@ -79,6 +89,7 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "0934d11a.giantswarm.io",
+		SyncPeriod:             &syncPeriod,
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/giantswarm/microerror"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -76,10 +77,16 @@ func NewAzureClusterReconciler(client client.Client, managementClusterName types
 func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	logger := log.FromContext(ctx)
 
+	logger.Info(fmt.Sprintf("Reconciling workload cluster %s", req.NamespacedName))
+	defer logger.Info(fmt.Sprintf("Finished reconciling workload cluster %s", req.NamespacedName))
+
 	// First we get workload cluster AzureCluster CR, and we check if the cluster is private or public.
 	var workloadCluster capz.AzureCluster
 	err = r.Client.Get(ctx, req.NamespacedName, &workloadCluster)
-	if err != nil {
+	if apierrors.IsNotFound(err) {
+		logger.Info("AzureCluster no longer exists")
+		return ctrl.Result{}, nil
+	} else if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 

@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/util/slice"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 )
@@ -58,7 +59,8 @@ func NewService(privateEndpointsScope Scope, privateLinksScope PrivateLinksScope
 	}, nil
 }
 
-func (s *Service) Reconcile(_ context.Context) error {
+func (s *Service) Reconcile(ctx context.Context) error {
+	logger := log.FromContext(ctx)
 	//
 	// First get all workload cluster private links. We will create private endpoints for all of
 	// them (by default there will be only one).
@@ -74,6 +76,7 @@ func (s *Service) Reconcile(_ context.Context) error {
 	// Add new private endpoints
 	//
 	for _, privateLink := range privateLinks {
+		logger.Info(fmt.Sprintf("Found private link %s", privateLink.Name))
 		manualApproval := !slice.Contains(privateLink.AutoApprovedSubscriptions, s.privateEndpointsScope.GetSubscriptionID())
 		var requestMessage string
 		if manualApproval {
@@ -100,6 +103,7 @@ func (s *Service) Reconcile(_ context.Context) error {
 			ManualApproval: manualApproval,
 		}
 		s.privateEndpointsScope.AddPrivateEndpointSpec(wantedPrivateEndpoint)
+		logger.Info(fmt.Sprintf("Ensured private endpoint %s is added to %s", wantedPrivateEndpoint.Name, s.privateEndpointsScope.GetClusterName()))
 	}
 
 	//
@@ -122,6 +126,7 @@ func (s *Service) Reconcile(_ context.Context) error {
 		}
 		if !privateEndpointIsUsed {
 			s.privateEndpointsScope.RemovePrivateEndpointByName(privateEndpoint.Name)
+			logger.Info(fmt.Sprintf("Removed private endpoint %s that is not used", privateEndpoint.Name))
 		}
 	}
 

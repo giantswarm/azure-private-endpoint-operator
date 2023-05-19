@@ -48,7 +48,7 @@ func NewScope(_ context.Context, managementCluster *capz.AzureCluster, client cl
 
 	privateEndpointsScope := scope{
 		BaseScope:        *baseScope,
-		privateEndpoints: privateEndpointsSubnet.PrivateEndpoints,
+		privateEndpoints: &privateEndpointsSubnet.PrivateEndpoints,
 	}
 
 	return &privateEndpointsScope, nil
@@ -56,7 +56,7 @@ func NewScope(_ context.Context, managementCluster *capz.AzureCluster, client cl
 
 type scope struct {
 	azurecluster.BaseScope
-	privateEndpoints []capz.PrivateEndpointSpec
+	privateEndpoints *capz.PrivateEndpoints
 }
 
 func (s *scope) GetPrivateEndpointsToWorkloadCluster(workloadClusterSubscriptionID, workloadClusterResourceGroup string) []capz.PrivateEndpointSpec {
@@ -65,7 +65,7 @@ func (s *scope) GetPrivateEndpointsToWorkloadCluster(workloadClusterSubscription
 		workloadClusterSubscriptionID,
 		workloadClusterResourceGroup)
 	var privateEndpointsToWorkloadCluster []capz.PrivateEndpointSpec
-	for _, privateEndpoint := range s.privateEndpoints {
+	for _, privateEndpoint := range *s.privateEndpoints {
 		foundPrivateEndpoint := false
 		for _, connection := range privateEndpoint.PrivateLinkServiceConnections {
 			if strings.Index(connection.PrivateLinkServiceID, workloadClusterSubscriptionIDPrefix) == 0 {
@@ -82,25 +82,25 @@ func (s *scope) GetPrivateEndpointsToWorkloadCluster(workloadClusterSubscription
 }
 
 func (s *scope) ContainsPrivateEndpointSpec(privateEndpoint capz.PrivateEndpointSpec) bool {
-	return sliceContains(s.privateEndpoints, privateEndpoint, arePrivateEndpointsEqual)
+	return sliceContains(*s.privateEndpoints, privateEndpoint, arePrivateEndpointsEqual)
 }
 
 func (s *scope) GetPrivateEndpoints() []capz.PrivateEndpointSpec {
-	return s.privateEndpoints
+	return *s.privateEndpoints
 }
 
 func (s *scope) AddPrivateEndpointSpec(spec capz.PrivateEndpointSpec) {
 	if !s.ContainsPrivateEndpointSpec(spec) {
-		s.privateEndpoints = append(s.privateEndpoints, spec)
+		*s.privateEndpoints = append(*s.privateEndpoints, spec)
 	}
 }
 
 func (s *scope) RemovePrivateEndpointByName(privateEndpointName string) {
-	for i := len(s.privateEndpoints) - 1; i >= 0; i-- {
-		if s.privateEndpoints[i].Name == privateEndpointName {
-			s.privateEndpoints = append(
-				s.privateEndpoints[:i],
-				s.privateEndpoints[i+1:]...)
+	for i := len(*s.privateEndpoints) - 1; i >= 0; i-- {
+		if (*s.privateEndpoints)[i].Name == privateEndpointName {
+			*s.privateEndpoints = append(
+				(*s.privateEndpoints)[:i],
+				(*s.privateEndpoints)[i+1:]...)
 			break
 		}
 	}

@@ -37,6 +37,7 @@ type PrivateLinksScope interface {
 	GetPrivateLinks(managementClusterName, managementClusterSubscriptionID string) ([]capz.PrivateLink, error)
 	LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLink, bool)
 	PatchObject(ctx context.Context) error
+	PrivateLinksReady() bool
 	Close(ctx context.Context) error
 }
 
@@ -70,6 +71,12 @@ func (s *Service) Reconcile(ctx context.Context) error {
 		s.privateEndpointsScope.GetSubscriptionID())
 	if err != nil {
 		return microerror.Mask(err)
+	}
+
+	if len(privateLinks) > 0 && !s.privateLinksScope.PrivateLinksReady() {
+		errorMessage := "Workload cluster private links are not yet ready"
+		logger.Info(errorMessage)
+		return microerror.Maskf(errors.PrivateLinksNotReadyError, errorMessage)
 	}
 
 	//

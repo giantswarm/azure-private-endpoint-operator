@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/giantswarm/microerror"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -147,7 +148,12 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 		err = privateEndpointsService.Reconcile(ctx)
-		if err != nil {
+		if errors.IsPrivateLinksNotReady(err) {
+			logger.Info("Private links are not ready, will try again in a minute")
+			return ctrl.Result{
+				RequeueAfter: time.Minute,
+			}, nil
+		} else if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 	} else {

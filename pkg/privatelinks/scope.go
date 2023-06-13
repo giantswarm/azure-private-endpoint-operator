@@ -37,6 +37,10 @@ type Scope struct {
 	privateLinks []capz.PrivateLink
 }
 
+func (s *Scope) PrivateLinksReady() bool {
+	return s.IsConditionTrue(capz.PrivateLinksReadyCondition)
+}
+
 func (s *Scope) LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLink, bool) {
 	for _, privateLink := range s.privateLinks {
 		currentPrivateLinkResourceID := fmt.Sprintf(

@@ -6,6 +6,8 @@ import (
 	"github.com/giantswarm/microerror"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -52,6 +54,10 @@ func (s *BaseScope) PatchObject(ctx context.Context) error {
 		return microerror.Mask(err)
 	}
 	return nil
+}
+
+func (s *BaseScope) IsConditionTrue(conditionType capi.ConditionType) bool {
+	return conditions.IsTrue(s.azureCluster, conditionType)
 }
 
 func (s *BaseScope) Close(ctx context.Context) error {

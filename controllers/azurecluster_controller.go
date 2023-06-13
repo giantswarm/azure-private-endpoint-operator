@@ -143,21 +143,29 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if workloadCluster.DeletionTimestamp.IsZero() {
 		// reconcile normal
-		controllerutil.AddFinalizer(&workloadCluster, AzureClusterControllerFinalizer)
-		err = privateLinksScope.PatchObject(ctx)
+		if !controllerutil.ContainsFinalizer(&workloadCluster, AzureClusterControllerFinalizer) {
+			controllerutil.AddFinalizer(&workloadCluster, AzureClusterControllerFinalizer)
+			err = privateLinksScope.PatchObject(ctx)
+			if err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+		}
+		err = privateEndpointsService.Reconcile(ctx)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-
-		err = privateEndpointsService.Reconcile(ctx)
 	} else {
 		err = privateEndpointsService.Delete(ctx)
-		if err == nil {
-			controllerutil.RemoveFinalizer(&workloadCluster, AzureClusterControllerFinalizer)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
 		}
-	}
-	if err != nil {
-		return ctrl.Result{}, microerror.Mask(err)
+		if controllerutil.ContainsFinalizer(&workloadCluster, AzureClusterControllerFinalizer) {
+			controllerutil.RemoveFinalizer(&workloadCluster, AzureClusterControllerFinalizer)
+			err = privateLinksScope.PatchObject(ctx)
+			if err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+		}
 	}
 
 	return ctrl.Result{}, nil

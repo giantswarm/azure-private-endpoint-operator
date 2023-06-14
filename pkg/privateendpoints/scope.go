@@ -6,6 +6,8 @@ import (
 	"net"
 	"strings"
 
+	// ignore SA1019 deprecated package because we are using CAPZ that still uses the old package
+	//nolint:staticcheck
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2022-07-01/network"
 	"github.com/giantswarm/microerror"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"

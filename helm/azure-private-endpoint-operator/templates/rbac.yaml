@@ -6,16 +6,17 @@ metadata:
   {{- include "labels.common" . | nindent 4 }}
 rules:
 #
-# AzureCluster
+# Cluster and AzureCluster
 #
 - apiGroups:
+  - cluster.x-k8s.io
   - infrastructure.cluster.x-k8s.io
   resources:
   - azureclusters
   - azureclusters/status
+  - clusters
+  - clusters/status
   verbs:
-  - create
-  - delete
   - get
   - list
   - patch

@@ -3,6 +3,7 @@ package privatelinks
 import (
 	"context"
 	"fmt"
+	"net"
 
 	"github.com/giantswarm/microerror"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
@@ -12,6 +13,10 @@ import (
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azurecluster"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privateendpoints"
+)
+
+const (
+	azurePrivateEndpointOperatorApiServerAnnotation string = "azure-private-endpoint-operator.giantswarm.io/private-link-apiserver-ip"
 )
 
 func NewScope(_ context.Context, workloadCluster *capz.AzureCluster, client client.Client) (privateendpoints.PrivateLinksScope, error) {
@@ -35,6 +40,10 @@ func NewScope(_ context.Context, workloadCluster *capz.AzureCluster, client clie
 type Scope struct {
 	azurecluster.BaseScope
 	privateLinks []capz.PrivateLink
+}
+
+func (s *Scope) SetPrivateEndpointIPAddress(ip net.IP) {
+	s.BaseScope.SetAnnotation(azurePrivateEndpointOperatorApiServerAnnotation, ip.String())
 }
 
 func (s *Scope) PrivateLinksReady() bool {

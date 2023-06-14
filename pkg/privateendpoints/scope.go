@@ -3,17 +3,20 @@ package privateendpoints
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2022-07-01/network"
 	"github.com/giantswarm/microerror"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	"sigs.k8s.io/cluster-api-provider-azure/azure"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azurecluster"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 )
 
-func NewScope(_ context.Context, managementCluster *capz.AzureCluster, client client.Client) (Scope, error) {
+func NewScope(_ context.Context, managementCluster *capz.AzureCluster, client client.Client, authorizer azure.Authorizer) (Scope, error) {
 	if managementCluster == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "managementCluster must be set")
 	}
@@ -46,9 +49,13 @@ func NewScope(_ context.Context, managementCluster *capz.AzureCluster, client cl
 		return nil, microerror.Mask(err)
 	}
 
+	privateEndpointClient := network.NewPrivateEndpointsClientWithBaseURI(authorizer.BaseURI(), authorizer.SubscriptionID())
+	azure.SetAutoRestClientDefaults(&privateEndpointClient.Client, authorizer.Authorizer())
+
 	privateEndpointsScope := scope{
-		BaseScope:        *baseScope,
-		privateEndpoints: &privateEndpointsSubnet.PrivateEndpoints,
+		BaseScope:              *baseScope,
+		privateEndpoints:       &privateEndpointsSubnet.PrivateEndpoints,
+		privateEndpointsClient: &privateEndpointClient,
 	}
 
 	return &privateEndpointsScope, nil
@@ -56,7 +63,42 @@ func NewScope(_ context.Context, managementCluster *capz.AzureCluster, client cl
 
 type scope struct {
 	azurecluster.BaseScope
-	privateEndpoints *capz.PrivateEndpoints
+	privateEndpoints       *capz.PrivateEndpoints
+	privateEndpointsClient *network.PrivateEndpointsClient
+}
+
+func (s *scope) GetPrivateEndpointIPAddress(ctx context.Context, privateEndpointName string) (net.IP, error) {
+	privateEndpoint, err := s.privateEndpointsClient.Get(ctx, s.GetResourceGroup(), privateEndpointName, "")
+	if err != nil {
+		return net.IP{}, microerror.Mask(err)
+	}
+	var result net.IP
+	if privateEndpoint.NetworkInterfaces == nil {
+		return result, microerror.Maskf(errors.PrivateEndpointNetworkInterfaceNotFoundError, "could not find private endpoint network interface")
+	}
+
+	found := false
+	for _, networkInterface := range *privateEndpoint.NetworkInterfaces {
+		if networkInterface.IPConfigurations == nil {
+			continue
+		}
+		for _, ipConfig := range *networkInterface.IPConfigurations {
+			if ipConfig.PrivateIPAddress == nil {
+				continue
+			}
+			result = net.ParseIP(*ipConfig.PrivateIPAddress)
+			found = true
+		}
+		if found {
+			break
+		}
+	}
+
+	if found {
+		return result, nil
+	} else {
+		return result, microerror.Maskf(errors.PrivateEndpointNetworkInterfacePrivateAddressNotFoundError, "could not find private endpoint network interface private IP address")
+	}
 }
 
 func (s *scope) GetPrivateEndpointsToWorkloadCluster(workloadClusterSubscriptionID, workloadClusterResourceGroup string) []capz.PrivateEndpointSpec {

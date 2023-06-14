@@ -3,6 +3,7 @@ package privateendpoints
 import (
 	"context"
 	"fmt"
+	"net"
 
 	"github.com/giantswarm/microerror"
 	"k8s.io/apimachinery/pkg/types"
@@ -21,6 +22,7 @@ type Scope interface {
 	GetResourceGroup() string
 	GetPrivateEndpoints() []capz.PrivateEndpointSpec
 	GetPrivateEndpointsToWorkloadCluster(workloadClusterSubscriptionID, workloadClusterResourceGroup string) []capz.PrivateEndpointSpec
+	GetPrivateEndpointIPAddress(ctx context.Context, privateEndpointName string) (net.IP, error)
 	ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec) bool
 	AddPrivateEndpointSpec(capz.PrivateEndpointSpec)
 	RemovePrivateEndpointByName(string)
@@ -38,6 +40,7 @@ type PrivateLinksScope interface {
 	LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLink, bool)
 	PatchObject(ctx context.Context) error
 	PrivateLinksReady() bool
+	SetPrivateEndpointIPAddress(ip net.IP)
 	Close(ctx context.Context) error
 }
 
@@ -111,6 +114,17 @@ func (s *Service) Reconcile(ctx context.Context) error {
 		}
 		s.privateEndpointsScope.AddPrivateEndpointSpec(wantedPrivateEndpoint)
 		logger.Info(fmt.Sprintf("Ensured private endpoint %s is added to %s", wantedPrivateEndpoint.Name, s.privateEndpointsScope.GetClusterName()))
+
+		// Apps running in the MC access WC API server via private endpoint that connects to private
+		// link. For that access MC apps are connecting to the private endpoint IP from the MC
+		// subnet. Here we set that private endpoint IP in the workload AzureCluster as an
+		// annotation. dns-operator-azure will then use that annotation to create A records in the
+		// DNS zone in the MC resource group, so that MC apps can access WC API server via FQDN.
+		privateEndpointIPAddress, err := s.privateEndpointsScope.GetPrivateEndpointIPAddress(ctx, wantedPrivateEndpoint.Name)
+		if err != nil {
+			return microerror.Mask(err)
+		}
+		s.privateLinksScope.SetPrivateEndpointIPAddress(privateEndpointIPAddress)
 	}
 
 	//

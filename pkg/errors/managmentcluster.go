@@ -21,3 +21,21 @@ var SubscriptionCannotConnectToPrivateLinkError = &microerror.Error{
 func IsSubscriptionCannotConnectToPrivateLinkError(err error) bool {
 	return microerror.Cause(err) == SubscriptionCannotConnectToPrivateLinkError
 }
+
+var PrivateEndpointNetworkInterfacePrivateAddressNotFoundError = &microerror.Error{
+	Kind: "PrivateEndpointNetworkInterfacePrivateAddressNotFoundError",
+}
+
+// IsPrivateEndpointNetworkInterfacePrivateAddressNotFound asserts PrivateEndpointNetworkInterfacePrivateAddressNotFoundError.
+func IsPrivateEndpointNetworkInterfacePrivateAddressNotFound(err error) bool {
+	return microerror.Cause(err) == PrivateEndpointNetworkInterfacePrivateAddressNotFoundError
+}
+
+var PrivateEndpointNetworkInterfaceNotFoundError = &microerror.Error{
+	Kind: "PrivateEndpointNetworkInterfaceNotFoundError",
+}
+
+// IsPrivateEndpointNetworkInterfaceNotFound asserts PrivateEndpointNetworkInterfaceNotFoundError.
+func IsPrivateEndpointNetworkInterfaceNotFound(err error) bool {
+	return microerror.Cause(err) == PrivateEndpointNetworkInterfaceNotFoundError
+}

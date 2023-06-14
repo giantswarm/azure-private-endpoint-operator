@@ -25,6 +25,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	"sigs.k8s.io/cluster-api-provider-azure/azure/scope"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -82,8 +84,8 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	defer logger.Info(fmt.Sprintf("Finished reconciling workload cluster %s", req.NamespacedName))
 
 	// First we get workload cluster AzureCluster CR, and we check if the cluster is private or public.
-	var workloadCluster capz.AzureCluster
-	err = r.Client.Get(ctx, req.NamespacedName, &workloadCluster)
+	var workloadAzureCluster capz.AzureCluster
+	err = r.Client.Get(ctx, req.NamespacedName, &workloadAzureCluster)
 	if apierrors.IsNotFound(err) {
 		logger.Info("AzureCluster no longer exists")
 		return ctrl.Result{}, nil
@@ -93,39 +95,56 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// If the workload cluster is public then we return, as there is no need to create a private endpoint to access
 	// a public load balancer
-	if workloadCluster.Spec.NetworkSpec.APIServerLB.Type == capz.Public {
-		logger.Info(fmt.Sprintf("Skipping reconciliation of public workload cluster %s", workloadCluster.Name))
+	if workloadAzureCluster.Spec.NetworkSpec.APIServerLB.Type == capz.Public {
+		logger.Info(fmt.Sprintf("Skipping reconciliation of public workload cluster %s", workloadAzureCluster.Name))
 		return ctrl.Result{}, nil
 	}
 
 	// We now expect that we are working with an internal load balancer (which is used for private clusters), so any
 	// other load balancer type (e.g. potentially added in the future) is considered an error here.
-	if workloadCluster.Spec.NetworkSpec.APIServerLB.Type != capz.Internal {
+	if workloadAzureCluster.Spec.NetworkSpec.APIServerLB.Type != capz.Internal {
 		return ctrl.Result{},
 			microerror.Maskf(
 				errors.UnknownLoadBalancerTypeError,
 				"expected that load balancer type is %s, got %s",
 				capz.Internal,
-				workloadCluster.Spec.NetworkSpec.APIServerLB.Type)
+				workloadAzureCluster.Spec.NetworkSpec.APIServerLB.Type)
 	}
 
-	var managementCluster capz.AzureCluster
+	var managementAzureCluster capz.AzureCluster
+	err = r.Client.Get(ctx, r.managementClusterName, &managementAzureCluster)
+	if err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
+	}
+	var managementCluster capi.Cluster
 	err = r.Client.Get(ctx, r.managementClusterName, &managementCluster)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
+	// Create the scope.
+	managementClusterCapzScope, err := scope.NewClusterScope(ctx, scope.ClusterScopeParams{
+		Client:       r.Client,
+		Cluster:      &managementCluster,
+		AzureCluster: &managementAzureCluster,
+	})
 
 	// Create WC private links scope - we use this to get the info about the private workload
 	// cluster private links, and then we make sure to have a private endpoints that connect to the
 	// private links.
-	privateLinksScope, err := privatelinks.NewScope(ctx, &workloadCluster, r.Client)
+	privateLinksScope, err := privatelinks.NewScope(ctx, &workloadAzureCluster, r.Client)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
+	// Always close the scope when exiting this function, so we can persist any WC AzureCluster changes.
+	defer func() {
+		if closeErr := privateLinksScope.Close(ctx); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	// Create MC private endpoints scope - we use this to get the info about the management cluster
 	// private endpoints and to update them.
-	privateEndpointsScope, err := privateendpoints.NewScope(ctx, &managementCluster, r.Client)
+	privateEndpointsScope, err := privateendpoints.NewScope(ctx, &managementAzureCluster, r.Client, managementClusterCapzScope)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
@@ -142,14 +161,14 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	if workloadCluster.DeletionTimestamp.IsZero() {
-		err = r.setFinalizer(ctx, privateLinksScope, &workloadCluster)
+	if workloadAzureCluster.DeletionTimestamp.IsZero() {
+		err = r.setFinalizer(ctx, privateLinksScope, &workloadAzureCluster)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 		err = privateEndpointsService.Reconcile(ctx)
-		if errors.IsPrivateLinksNotReady(err) {
-			logger.Info("Private links are not ready, will try again in a minute")
+		if errors.IsRetriable(err) {
+			logger.Info("A retriable error occurred, trying again in a minute", "error", err)
 			return ctrl.Result{
 				RequeueAfter: time.Minute,
 			}, nil
@@ -161,7 +180,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		err = r.removeFinalizer(ctx, privateLinksScope, &workloadCluster)
+		err = r.removeFinalizer(ctx, privateLinksScope, &workloadAzureCluster)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}

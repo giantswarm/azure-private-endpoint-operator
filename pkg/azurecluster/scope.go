@@ -60,6 +60,15 @@ func (s *BaseScope) IsConditionTrue(conditionType capi.ConditionType) bool {
 	return conditions.IsTrue(s.azureCluster, conditionType)
 }
 
+func (s *BaseScope) SetAnnotation(annotation, value string) {
+	annotations := s.azureCluster.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations[annotation] = value
+	s.azureCluster.SetAnnotations(annotations)
+}
+
 func (s *BaseScope) Close(ctx context.Context) error {
 	err := s.PatchObject(ctx)
 	if err != nil {

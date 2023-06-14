@@ -23,6 +23,7 @@ import (
 
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/types"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -47,6 +48,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
+	utilruntime.Must(capi.AddToScheme(scheme))
 	utilruntime.Must(capz.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }

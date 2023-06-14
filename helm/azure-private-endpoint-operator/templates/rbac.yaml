@@ -5,6 +5,9 @@ metadata:
   labels:
   {{- include "labels.common" . | nindent 4 }}
 rules:
+#
+# AzureCluster
+#
 - apiGroups:
   - infrastructure.cluster.x-k8s.io
   resources:
@@ -18,6 +21,9 @@ rules:
   - patch
   - update
   - watch
+#
+# Leases
+#
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -26,6 +32,9 @@ rules:
   - get
   - create
   - update
+#
+# Events
+#
 - apiGroups:
   - ""
   resources:
@@ -33,6 +42,56 @@ rules:
   verbs:
   - create
   - patch
+#
+# AzureClusterIdentity
+#
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - azureclusteridentities
+  - azureclusteridentities/status
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+#
+# AzureIdentity
+#
+- apiGroups:
+  - aadpodidentity.k8s.io
+  resources:
+  - azureidentities
+  - azureidentities/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - aadpodidentity.k8s.io
+  resources:
+  - azureidentities
+  verbs:
+  - create
+#
+# AzureIdentityBinding
+#
+- apiGroups:
+  - aadpodidentity.k8s.io
+  resources:
+  - azureidentitybindings
+  - azureidentitybindings/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - aadpodidentity.k8s.io
+  resources:
+  - azureidentitybindings
+  verbs:
+  - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

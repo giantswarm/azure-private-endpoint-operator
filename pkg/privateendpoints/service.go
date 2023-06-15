@@ -124,7 +124,9 @@ func (s *Service) Reconcile(ctx context.Context) error {
 		if err != nil {
 			return microerror.Mask(err)
 		}
+		logger.Info("found private endpoint IP address in MC", "ipAddress", privateEndpointIPAddress.String())
 		s.privateLinksScope.SetPrivateEndpointIPAddress(privateEndpointIPAddress)
+		logger.Info("set private endpoint IP address in WC AzureCluster", "ipAddress", privateEndpointIPAddress.String())
 	}
 
 	//

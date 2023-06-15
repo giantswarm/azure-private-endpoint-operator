@@ -25,8 +25,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	"sigs.k8s.io/cluster-api-provider-azure/azure/scope"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -116,20 +114,6 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
-	var managementCluster capi.Cluster
-	err = r.Client.Get(ctx, r.managementClusterName, &managementCluster)
-	if err != nil {
-		return ctrl.Result{}, microerror.Mask(err)
-	}
-	// Create the scope.
-	managementClusterCapzScope, err := scope.NewClusterScope(ctx, scope.ClusterScopeParams{
-		Client:       r.Client,
-		Cluster:      &managementCluster,
-		AzureCluster: &managementAzureCluster,
-	})
-	if err != nil {
-		return ctrl.Result{}, microerror.Mask(err)
-	}
 
 	// Create WC private links scope - we use this to get the info about the private workload
 	// cluster private links, and then we make sure to have a private endpoints that connect to the
@@ -147,7 +131,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Create MC private endpoints scope - we use this to get the info about the management cluster
 	// private endpoints and to update them.
-	privateEndpointsScope, err := privateendpoints.NewScope(ctx, &managementAzureCluster, r.Client, managementClusterCapzScope)
+	privateEndpointsScope, err := privateendpoints.NewScope(ctx, &managementAzureCluster, r.Client)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}

@@ -6,19 +6,24 @@ import (
 	"net"
 	"strings"
 
-	// ignore SA1019 deprecated package because we are using CAPZ that still uses the old package
-	//nolint:staticcheck
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2022-07-01/network"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v2"
 	"github.com/giantswarm/microerror"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	"sigs.k8s.io/cluster-api-provider-azure/azure"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azurecluster"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 )
 
-func NewScope(_ context.Context, managementCluster *capz.AzureCluster, client client.Client, authorizer azure.Authorizer) (Scope, error) {
+const (
+	clientSecretKeyName = "clientSecret"
+)
+
+func NewScope(ctx context.Context, managementCluster *capz.AzureCluster, client client.Client) (Scope, error) {
 	if managementCluster == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "managementCluster must be set")
 	}
@@ -51,44 +56,106 @@ func NewScope(_ context.Context, managementCluster *capz.AzureCluster, client cl
 		return nil, microerror.Mask(err)
 	}
 
-	privateEndpointClient := network.NewPrivateEndpointsClientWithBaseURI(authorizer.BaseURI(), authorizer.SubscriptionID())
-	azure.SetAutoRestClientDefaults(&privateEndpointClient.Client, authorizer.Authorizer())
+	privateEndpointClient, err := newPrivateEndpointClient(ctx, client, managementCluster)
+	if err != nil {
+		return nil, microerror.Mask(err)
+	}
 
 	privateEndpointsScope := scope{
 		BaseScope:              *baseScope,
 		privateEndpoints:       &privateEndpointsSubnet.PrivateEndpoints,
-		privateEndpointsClient: &privateEndpointClient,
+		privateEndpointsClient: privateEndpointClient,
 	}
 
 	return &privateEndpointsScope, nil
 }
 
+func newPrivateEndpointClient(ctx context.Context, client client.Client, azureCluster *capz.AzureCluster) (*armnetwork.PrivateEndpointsClient, error) {
+	var cred azcore.TokenCredential
+	var err error
+
+	azureClusterIdentity := &capz.AzureClusterIdentity{}
+	name := types.NamespacedName{
+		Namespace: azureCluster.Spec.IdentityRef.Namespace,
+		Name:      azureCluster.Spec.IdentityRef.Name,
+	}
+	err = client.Get(ctx, name, azureClusterIdentity)
+	if err != nil {
+		return nil, microerror.Mask(err)
+	}
+
+	switch azureClusterIdentity.Spec.Type {
+	case capz.UserAssignedMSI:
+		cred, err = azidentity.NewManagedIdentityCredential(&azidentity.ManagedIdentityCredentialOptions{
+			ID: azidentity.ClientID(azureClusterIdentity.Spec.ClientID),
+		})
+		if err != nil {
+			return nil, microerror.Mask(err)
+		}
+	case capz.ManualServicePrincipal:
+		clientSecretName := types.NamespacedName{
+			Namespace: azureClusterIdentity.Spec.ClientSecret.Namespace,
+			Name:      azureClusterIdentity.Spec.ClientSecret.Name,
+		}
+		secret := &corev1.Secret{}
+		err = client.Get(ctx, clientSecretName, secret)
+		if err != nil {
+			return nil, microerror.Mask(err)
+		}
+
+		cred, err = azidentity.NewClientSecretCredential(
+			azureClusterIdentity.Spec.TenantID,
+			azureClusterIdentity.Spec.ClientID,
+			string(secret.Data[clientSecretKeyName]),
+			nil)
+		if err != nil {
+			return nil, microerror.Mask(err)
+		}
+	}
+
+	privateEndpointsClient, err := armnetwork.NewPrivateEndpointsClient(azureCluster.Spec.SubscriptionID, cred, nil)
+	if err != nil {
+		return nil, microerror.Mask(err)
+	}
+
+	return privateEndpointsClient, nil
+}
+
 type scope struct {
 	azurecluster.BaseScope
 	privateEndpoints       *capz.PrivateEndpoints
-	privateEndpointsClient *network.PrivateEndpointsClient
+	privateEndpointsClient *armnetwork.PrivateEndpointsClient
 }
 
 func (s *scope) GetPrivateEndpointIPAddress(ctx context.Context, privateEndpointName string) (net.IP, error) {
-	privateEndpoint, err := s.privateEndpointsClient.Get(ctx, s.GetResourceGroup(), privateEndpointName, "")
+	privateEndpointResponse, err := s.privateEndpointsClient.Get(ctx, s.GetResourceGroup(), privateEndpointName, nil)
 	if err != nil {
 		return net.IP{}, microerror.Mask(err)
 	}
+	privateEndpoint := privateEndpointResponse.PrivateEndpoint
+
 	var result net.IP
-	if privateEndpoint.NetworkInterfaces == nil {
+	if privateEndpoint.Properties == nil ||
+		privateEndpoint.Properties.NetworkInterfaces == nil ||
+		len(privateEndpoint.Properties.NetworkInterfaces) == 0 {
 		return result, microerror.Maskf(errors.PrivateEndpointNetworkInterfaceNotFoundError, "could not find private endpoint network interface")
 	}
 
 	found := false
-	for _, networkInterface := range *privateEndpoint.NetworkInterfaces {
-		if networkInterface.IPConfigurations == nil {
+	for _, networkInterface := range privateEndpoint.Properties.NetworkInterfaces {
+		if networkInterface == nil ||
+			networkInterface.Properties == nil ||
+			networkInterface.Properties.IPConfigurations == nil ||
+			len(networkInterface.Properties.IPConfigurations) == 0 {
 			continue
 		}
-		for _, ipConfig := range *networkInterface.IPConfigurations {
-			if ipConfig.PrivateIPAddress == nil {
+		for _, ipConfig := range networkInterface.Properties.IPConfigurations {
+			if ipConfig == nil ||
+				ipConfig.Properties == nil ||
+				ipConfig.Properties.PrivateIPAddress == nil {
 				continue
 			}
-			result = net.ParseIP(*ipConfig.PrivateIPAddress)
+			result = net.ParseIP(*ipConfig.Properties.PrivateIPAddress)
 			found = true
 		}
 		if found {

@@ -21,12 +21,11 @@ import (
 	"os"
 	"time"
 
+	aadpodv1 "github.com/Azure/aad-pod-identity/pkg/apis/aadpodidentity/v1"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -50,6 +49,7 @@ func init() {
 
 	utilruntime.Must(capi.AddToScheme(scheme))
 	utilruntime.Must(capz.AddToScheme(scheme))
+	utilruntime.Must(aadpodv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

@@ -3,6 +3,7 @@ module github.com/giantswarm/azure-private-endpoint-operator
 go 1.19
 
 require (
+	github.com/Azure/aad-pod-identity v1.8.14
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 	github.com/giantswarm/microerror v0.4.0
 	github.com/onsi/ginkgo/v2 v2.8.4
@@ -17,7 +18,6 @@ require (
 
 require (
 	cloud.google.com/go v0.97.0 // indirect
-	github.com/Azure/aad-pod-identity v1.8.14 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.3.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.2.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.1.2 // indirect

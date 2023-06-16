@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v2"
 	"github.com/giantswarm/microerror"
@@ -128,8 +129,16 @@ type scope struct {
 }
 
 func (s *scope) GetPrivateEndpointIPAddress(ctx context.Context, privateEndpointName string) (net.IP, error) {
-	privateEndpointResponse, err := s.privateEndpointsClient.Get(ctx, s.GetResourceGroup(), privateEndpointName, nil)
-	if err != nil {
+	privateEndpointResponse, err := s.privateEndpointsClient.Get(
+		ctx,
+		s.GetResourceGroup(),
+		privateEndpointName,
+		&armnetwork.PrivateEndpointsClientGetOptions{
+			Expand: to.Ptr[string]("NetworkInterfaces"),
+		})
+	if errors.IsAzureResourceNotFound(err) {
+		return net.IP{}, microerror.Maskf(errors.PrivateEndpointNotFoundError, "private endpoint not found")
+	} else if err != nil {
 		return net.IP{}, microerror.Mask(err)
 	}
 	privateEndpoint := privateEndpointResponse.PrivateEndpoint

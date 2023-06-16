@@ -166,6 +166,7 @@ func (s *scope) GetPrivateEndpointIPAddress(ctx context.Context, privateEndpoint
 			}
 			result = net.ParseIP(*ipConfig.Properties.PrivateIPAddress)
 			found = true
+			break
 		}
 		if found {
 			break
@@ -175,7 +176,9 @@ func (s *scope) GetPrivateEndpointIPAddress(ctx context.Context, privateEndpoint
 	if found {
 		return result, nil
 	} else {
-		return result, microerror.Maskf(errors.PrivateEndpointNetworkInterfacePrivateAddressNotFoundError, "could not find private endpoint network interface private IP address")
+		return result, microerror.Maskf(
+			errors.PrivateEndpointNetworkInterfacePrivateAddressNotFoundError,
+			fmt.Sprintf("could not find private endpoint network interface private IP address, got private endpoint: %v", privateEndpoint))
 	}
 }
 

@@ -31,7 +31,7 @@ spec:
     # Needed for Kubernetes API access (https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/)
     - projected
   allowPrivilegeEscalation: false
-  hostNetwork: false
+  hostNetwork: true
   hostIPC: false
   hostPID: false
 {{- end }}

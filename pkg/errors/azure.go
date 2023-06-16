@@ -11,7 +11,7 @@ import (
 func IsAzureResourceNotFound(err error) bool {
 	var responseError *azcore.ResponseError
 	if errors.As(err, &responseError) {
-		return responseError.StatusCode == http.StatusNotFound
+		return responseError.StatusCode == http.StatusNotFound || responseError.ErrorCode == "ResourceNotFound"
 	}
 	return false
 }

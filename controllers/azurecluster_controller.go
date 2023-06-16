@@ -149,10 +149,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if workloadAzureCluster.DeletionTimestamp.IsZero() {
-		err = r.setFinalizer(ctx, privateLinksScope, &workloadAzureCluster)
-		if err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
-		}
+		r.setFinalizer(ctx, privateLinksScope, &workloadAzureCluster)
 		err = privateEndpointsService.Reconcile(ctx)
 		if errors.IsRetriable(err) {
 			logger.Info("A retriable error occurred, trying again in a minute", "error", err)
@@ -167,35 +164,22 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		err = r.removeFinalizer(ctx, privateLinksScope, &workloadAzureCluster)
-		if err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
-		}
+		r.removeFinalizer(ctx, privateLinksScope, &workloadAzureCluster)
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *AzureClusterReconciler) setFinalizer(ctx context.Context, workloadClusterScope privateendpoints.PrivateLinksScope, workloadCluster *capz.AzureCluster) error {
+func (r *AzureClusterReconciler) setFinalizer(ctx context.Context, workloadClusterScope privateendpoints.PrivateLinksScope, workloadCluster *capz.AzureCluster) {
 	if !controllerutil.ContainsFinalizer(workloadCluster, AzureClusterControllerFinalizer) {
 		controllerutil.AddFinalizer(workloadCluster, AzureClusterControllerFinalizer)
-		err := workloadClusterScope.PatchObject(ctx)
-		if err != nil {
-			return microerror.Mask(err)
-		}
 	}
-	return nil
 }
 
-func (r *AzureClusterReconciler) removeFinalizer(ctx context.Context, workloadClusterScope privateendpoints.PrivateLinksScope, workloadCluster *capz.AzureCluster) error {
+func (r *AzureClusterReconciler) removeFinalizer(ctx context.Context, workloadClusterScope privateendpoints.PrivateLinksScope, workloadCluster *capz.AzureCluster) {
 	if controllerutil.ContainsFinalizer(workloadCluster, AzureClusterControllerFinalizer) {
 		controllerutil.RemoveFinalizer(workloadCluster, AzureClusterControllerFinalizer)
-		err := workloadClusterScope.PatchObject(ctx)
-		if err != nil {
-			return microerror.Mask(err)
-		}
 	}
-	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

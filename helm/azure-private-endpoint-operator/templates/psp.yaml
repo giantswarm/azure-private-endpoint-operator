@@ -32,6 +32,9 @@ spec:
     - projected
   allowPrivilegeEscalation: false
   hostNetwork: true
+  hostPorts:
+  - min: 8777
+    max: 8777
   hostIPC: false
   hostPID: false
 {{- end }}

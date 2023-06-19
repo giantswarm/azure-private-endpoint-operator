@@ -12,14 +12,13 @@ import (
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azurecluster"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
-	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privateendpoints"
 )
 
 const (
 	azurePrivateEndpointOperatorApiServerAnnotation string = "azure-private-endpoint-operator.giantswarm.io/private-link-apiserver-ip"
 )
 
-func NewScope(_ context.Context, workloadCluster *capz.AzureCluster, client client.Client) (privateendpoints.PrivateLinksScope, error) {
+func NewScope(_ context.Context, workloadCluster *capz.AzureCluster, client client.Client) (*Scope, error) {
 	if workloadCluster == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "workloadCluster must be set")
 	}

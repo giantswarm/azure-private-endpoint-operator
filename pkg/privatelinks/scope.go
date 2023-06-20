@@ -1,7 +1,6 @@
 package privatelinks
 
 import (
-	"context"
 	"fmt"
 	"net"
 
@@ -18,9 +17,12 @@ const (
 	azurePrivateEndpointOperatorApiServerAnnotation string = "azure-private-endpoint-operator.giantswarm.io/private-link-apiserver-ip"
 )
 
-func NewScope(_ context.Context, workloadCluster *capz.AzureCluster, client client.Client) (*Scope, error) {
+func NewScope(workloadCluster *capz.AzureCluster, client client.Client) (*Scope, error) {
 	if workloadCluster == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "workloadCluster must be set")
+	}
+	if client == nil {
+		return nil, microerror.Maskf(errors.InvalidConfigError, "client must be set")
 	}
 
 	baseScope, err := azurecluster.NewBaseScope(workloadCluster, client)

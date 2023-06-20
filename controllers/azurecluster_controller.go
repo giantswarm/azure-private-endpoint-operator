@@ -118,7 +118,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Create WC private links scope - we use this to get the info about the private workload
 	// cluster private links, and then we make sure to have a private endpoints that connect to the
 	// private links.
-	privateLinksScope, err := privatelinks.NewScope(ctx, &workloadAzureCluster, r.Client)
+	privateLinksScope, err := privatelinks.NewScope(&workloadAzureCluster, r.Client)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}

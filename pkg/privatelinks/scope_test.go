@@ -1,6 +1,8 @@
 package privatelinks_test
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
@@ -54,6 +56,77 @@ var _ = Describe("Scope", func() {
 			It("creates the scope", func() {
 				_, err := privatelinks.NewScope(azureCluster, client)
 				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
+
+	Describe("looking up a private link with its resource ID", func() {
+		var privateLinkNames []string
+		var scope *privatelinks.Scope
+
+		JustBeforeEach(func() {
+			azureClusterBuilder := testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup)
+			for _, privateLinkName := range privateLinkNames {
+				azureClusterBuilder.WithPrivateLink(testhelpers.NewPrivateLinkBuilder(privateLinkName).Build())
+			}
+			azureCluster := azureClusterBuilder.Build()
+			capzSchema, err := capz.SchemeBuilder.Build()
+			Expect(err).NotTo(HaveOccurred())
+			client := fake.NewClientBuilder().
+				WithScheme(capzSchema).
+				WithObjects(azureCluster).Build()
+			scope, err = privatelinks.NewScope(azureCluster, client)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		When("AzureCluster has one private link", func() {
+			BeforeEach(func() {
+				privateLinkNames = []string{
+					"test-private-link",
+				}
+			})
+
+			It("finds the private link when looking up with the correct resource ID", func() {
+				privateLinkID := fmt.Sprintf(
+					"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
+					subscriptionID,
+					resourceGroup,
+					privateLinkNames[0])
+				privateLink, ok := scope.LookupPrivateLink(privateLinkID)
+				Expect(ok).To(BeTrue())
+				Expect(privateLink.Name).To(Equal(privateLinkNames[0]))
+			})
+
+			It("doesn't find the private link when looking up with an incorrect resource ID", func() {
+				privateLinkID := fmt.Sprintf(
+					"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
+					subscriptionID,
+					resourceGroup,
+					"some-other-private-link")
+				_, ok := scope.LookupPrivateLink(privateLinkID)
+				Expect(ok).To(BeFalse())
+			})
+		})
+
+		When("AzureCluster has multiple private links", func() {
+			BeforeEach(func() {
+				privateLinkNames = []string{
+					"test-private-link-1",
+					"test-private-link-2",
+				}
+			})
+
+			It("finds all private links when looking up with the correct resource ID", func() {
+				for _, privateLinkName := range privateLinkNames {
+					privateLinkID := fmt.Sprintf(
+						"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
+						subscriptionID,
+						resourceGroup,
+						privateLinkName)
+					privateLink, ok := scope.LookupPrivateLink(privateLinkID)
+					Expect(ok).To(BeTrue())
+					Expect(privateLink.Name).To(Equal(privateLinkName))
+				}
 			})
 		})
 	})

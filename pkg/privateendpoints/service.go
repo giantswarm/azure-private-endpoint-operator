@@ -36,7 +36,7 @@ type PrivateLinksScope interface {
 	GetSubscriptionID() string
 	GetLocation() string
 	GetResourceGroup() string
-	GetPrivateLinks(managementClusterName, managementClusterSubscriptionID string) ([]capz.PrivateLink, error)
+	GetPrivateLinksWithAllowedSubscription(managementClusterSubscriptionID string) []capz.PrivateLink
 	LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLink, bool)
 	PatchObject(ctx context.Context) error
 	PrivateLinksReady() bool
@@ -69,11 +69,14 @@ func (s *Service) Reconcile(ctx context.Context) error {
 	// First get all workload cluster private links. We will create private endpoints for all of
 	// them (by default there will be only one).
 	//
-	privateLinks, err := s.privateLinksScope.GetPrivateLinks(
-		s.privateEndpointsScope.GetClusterName().Name,
-		s.privateEndpointsScope.GetSubscriptionID())
-	if err != nil {
-		return microerror.Mask(err)
+	privateLinks := s.privateLinksScope.GetPrivateLinksWithAllowedSubscription(s.privateEndpointsScope.GetSubscriptionID())
+	if len(privateLinks) == 0 {
+		return microerror.Maskf(
+			errors.SubscriptionCannotConnectToPrivateLinkError,
+			"MC %s Azure subscription %s is not allowed to connect to any private link from the private workload cluster %s",
+			s.privateEndpointsScope.GetClusterName(),
+			s.privateEndpointsScope.GetSubscriptionID(),
+			s.privateLinksScope.GetClusterName())
 	}
 
 	if len(privateLinks) > 0 && !s.privateLinksScope.PrivateLinksReady() {
@@ -159,12 +162,7 @@ func (s *Service) Reconcile(ctx context.Context) error {
 func (s *Service) Delete(_ context.Context) error {
 	// First get all workload cluster private links. We will delete private endpoints for all of
 	// them.
-	privateLinks, err := s.privateLinksScope.GetPrivateLinks(
-		s.privateEndpointsScope.GetClusterName().Name,
-		s.privateEndpointsScope.GetSubscriptionID())
-	if err != nil {
-		return microerror.Mask(err)
-	}
+	privateLinks := s.privateLinksScope.GetPrivateLinksWithAllowedSubscription(s.privateEndpointsScope.GetSubscriptionID())
 
 	// For every private link, delete its corresponding private endpoint.
 	for _, privateLink := range privateLinks {

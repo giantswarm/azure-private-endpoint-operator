@@ -130,4 +130,75 @@ var _ = Describe("Scope", func() {
 			})
 		})
 	})
+
+	Describe("getting private links for a management cluster subscription", func() {
+		var privateLinksWithAllowedSubscriptions map[string][]string
+		var scope *privatelinks.Scope
+
+		JustBeforeEach(func() {
+			azureClusterBuilder := testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup)
+			for privateLinkName, allowedSubscriptions := range privateLinksWithAllowedSubscriptions {
+				privateLinkBuilder := testhelpers.NewPrivateLinkBuilder(privateLinkName)
+				for _, allowedSubscription := range allowedSubscriptions {
+					privateLinkBuilder = privateLinkBuilder.WithAllowedSubscription(allowedSubscription)
+				}
+				privateLink := privateLinkBuilder.Build()
+				azureClusterBuilder.WithPrivateLink(privateLink)
+			}
+			azureCluster := azureClusterBuilder.Build()
+			capzSchema, err := capz.SchemeBuilder.Build()
+			Expect(err).NotTo(HaveOccurred())
+			client := fake.NewClientBuilder().
+				WithScheme(capzSchema).
+				WithObjects(azureCluster).Build()
+			scope, err = privatelinks.NewScope(azureCluster, client)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		When("AzureCluster has one private link with allowed MC subscription", func() {
+			var privateLinkName string
+			BeforeEach(func() {
+				privateLinkName = "test-private-link"
+				privateLinksWithAllowedSubscriptions = map[string][]string{
+					privateLinkName: {
+						subscriptionID,
+					},
+				}
+			})
+
+			It("gets one private link for the allowed subscription ID", func() {
+				privateLinks := scope.GetPrivateLinksWithAllowedSubscription(subscriptionID)
+				Expect(privateLinks).To(HaveLen(1))
+				Expect(privateLinks[0].Name).To(Equal(privateLinkName))
+				Expect(privateLinks[0].AllowedSubscriptions).To(Equal(privateLinksWithAllowedSubscriptions[privateLinkName]))
+			})
+
+			It("doesn't get a private link for the disallowed subscription ID", func() {
+				privateLinks := scope.GetPrivateLinksWithAllowedSubscription("some-other-subs")
+				Expect(privateLinks).To(BeEmpty())
+			})
+		})
+
+		When("AzureCluster has multiple private links with MC subscription being allowed in one", func() {
+			var privateLinkName string
+			BeforeEach(func() {
+				privateLinkName = "test-private-link"
+				privateLinksWithAllowedSubscriptions = map[string][]string{
+					privateLinkName: {
+						subscriptionID,
+					},
+					"some-other-private-link": {
+						"some-other-subscription",
+					},
+				}
+			})
+
+			It("gets one private link for the allowed subscription ID", func() {
+				privateLinks := scope.GetPrivateLinksWithAllowedSubscription(subscriptionID)
+				Expect(privateLinks).To(HaveLen(1))
+				Expect(privateLinks[0].Name).To(Equal(privateLinkName))
+				Expect(privateLinks[0].AllowedSubscriptions).To(Equal(privateLinksWithAllowedSubscriptions[privateLinkName]))
+			})
+		})
+	})
 })

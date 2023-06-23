@@ -43,14 +43,6 @@ type Scope struct {
 	privateLinks []capz.PrivateLink
 }
 
-func (s *Scope) SetPrivateEndpointIPAddress(ip net.IP) {
-	s.BaseScope.SetAnnotation(azurePrivateEndpointOperatorApiServerAnnotation, ip.String())
-}
-
-func (s *Scope) PrivateLinksReady() bool {
-	return s.IsConditionTrue(capz.PrivateLinksReadyCondition)
-}
-
 func (s *Scope) LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLink, bool) {
 	for _, privateLink := range s.privateLinks {
 		currentPrivateLinkResourceID := fmt.Sprintf(
@@ -67,25 +59,21 @@ func (s *Scope) LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLin
 	return capz.PrivateLink{}, false
 }
 
-func (s *Scope) GetPrivateLinks(managementClusterName, managementClusterSubscriptionID string) ([]capz.PrivateLink, error) {
+func (s *Scope) GetPrivateLinksWithAllowedSubscription(managementClusterSubscriptionID string) []capz.PrivateLink {
 	var privateLinksWhereMCSubscriptionIsAllowed []capz.PrivateLink
 	for _, privateLink := range s.privateLinks {
-		if !slice.Contains(privateLink.AllowedSubscriptions, managementClusterSubscriptionID) {
-			continue
+		if slice.Contains(privateLink.AllowedSubscriptions, managementClusterSubscriptionID) {
+			privateLinksWhereMCSubscriptionIsAllowed = append(privateLinksWhereMCSubscriptionIsAllowed, privateLink)
 		}
-		privateLinksWhereMCSubscriptionIsAllowed = append(privateLinksWhereMCSubscriptionIsAllowed, privateLink)
 	}
 
-	// return an error if the MC subscription is not allowed to connect to any API server private link
-	if len(privateLinksWhereMCSubscriptionIsAllowed) == 0 && len(s.privateLinks) > 0 {
-		return nil,
-			microerror.Maskf(
-				errors.SubscriptionCannotConnectToPrivateLinkError,
-				"MC %s Azure subscription %s is not allowed to connect to any private link from the private workload cluster %s",
-				managementClusterName,
-				managementClusterSubscriptionID,
-				s.GetClusterName())
-	}
+	return privateLinksWhereMCSubscriptionIsAllowed
+}
 
-	return privateLinksWhereMCSubscriptionIsAllowed, nil
+func (s *Scope) PrivateLinksReady() bool {
+	return s.IsConditionTrue(capz.PrivateLinksReadyCondition)
+}
+
+func (s *Scope) SetPrivateEndpointIPAddress(ip net.IP) {
+	s.BaseScope.SetAnnotation(azurePrivateEndpointOperatorApiServerAnnotation, ip.String())
 }

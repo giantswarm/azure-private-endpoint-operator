@@ -6,6 +6,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -198,6 +200,66 @@ var _ = Describe("Scope", func() {
 				Expect(privateLinks).To(HaveLen(1))
 				Expect(privateLinks[0].Name).To(Equal(privateLinkName))
 				Expect(privateLinks[0].AllowedSubscriptions).To(Equal(privateLinksWithAllowedSubscriptions[privateLinkName]))
+			})
+		})
+	})
+
+	Describe("Check if private links are ready", func() {
+		var privateLinksCondition *capi.Condition
+		var scope *privatelinks.Scope
+
+		JustBeforeEach(func() {
+			azureCluster := testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
+				WithPrivateLink(testhelpers.NewPrivateLinkBuilder("test-private-link").Build()).
+				WithCondition(privateLinksCondition).
+				Build()
+
+			capzSchema, err := capz.SchemeBuilder.Build()
+			Expect(err).NotTo(HaveOccurred())
+			client := fake.NewClientBuilder().
+				WithScheme(capzSchema).
+				WithObjects(azureCluster).Build()
+			scope, err = privatelinks.NewScope(azureCluster, client)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		When("PrivateLinksReady condition has status True", func() {
+			BeforeEach(func() {
+				privateLinksCondition = conditions.TrueCondition(capz.PrivateLinksReadyCondition)
+			})
+			It("scope.PrivateLinksReady returns true", func() {
+				privateLinksReady := scope.PrivateLinksReady()
+				Expect(privateLinksReady).To(BeTrue())
+			})
+		})
+
+		When("PrivateLinksReady condition has status False", func() {
+			BeforeEach(func() {
+				privateLinksCondition = conditions.FalseCondition(capz.PrivateLinksReadyCondition, "Something", capi.ConditionSeverityError, "some error")
+			})
+			It("scope.PrivateLinksReady returns false", func() {
+				privateLinksReady := scope.PrivateLinksReady()
+				Expect(privateLinksReady).To(BeFalse())
+			})
+		})
+
+		When("PrivateLinksReady condition has status Unknown", func() {
+			BeforeEach(func() {
+				privateLinksCondition = conditions.UnknownCondition(capz.PrivateLinksReadyCondition, "Something", "some error")
+			})
+			It("scope.PrivateLinksReady returns false", func() {
+				privateLinksReady := scope.PrivateLinksReady()
+				Expect(privateLinksReady).To(BeFalse())
+			})
+		})
+
+		When("PrivateLinksReady condition is not set", func() {
+			BeforeEach(func() {
+				privateLinksCondition = nil
+			})
+			It("scope.PrivateLinksReady returns false", func() {
+				privateLinksReady := scope.PrivateLinksReady()
+				Expect(privateLinksReady).To(BeFalse())
 			})
 		})
 	})

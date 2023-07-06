@@ -3,12 +3,14 @@ package testhelpers
 import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 type AzureClusterBuilder struct {
 	subscriptionID string
 	resourceGroup  string
 	privateLinks   []capz.PrivateLink
+	conditions     capi.Conditions
 }
 
 func NewAzureClusterBuilder(subscriptionID, resourceGroup string) *AzureClusterBuilder {
@@ -20,6 +22,13 @@ func NewAzureClusterBuilder(subscriptionID, resourceGroup string) *AzureClusterB
 
 func (b *AzureClusterBuilder) WithPrivateLink(privateLink capz.PrivateLink) *AzureClusterBuilder {
 	b.privateLinks = append(b.privateLinks, privateLink)
+	return b
+}
+
+func (b *AzureClusterBuilder) WithCondition(condition *capi.Condition) *AzureClusterBuilder {
+	if condition != nil {
+		b.conditions = append(b.conditions, *condition)
+	}
 	return b
 }
 
@@ -39,6 +48,9 @@ func (b *AzureClusterBuilder) Build() *capz.AzureCluster {
 					PrivateLinks: b.privateLinks,
 				},
 			},
+		},
+		Status: capz.AzureClusterStatus{
+			Conditions: b.conditions,
 		},
 	}
 

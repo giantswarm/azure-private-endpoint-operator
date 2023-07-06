@@ -204,7 +204,7 @@ var _ = Describe("Scope", func() {
 		})
 	})
 
-	Describe("Check if private links are ready", func() {
+	Describe("check if private links are ready", func() {
 		var privateLinksCondition *capi.Condition
 		var scope *privatelinks.Scope
 
@@ -261,6 +261,31 @@ var _ = Describe("Scope", func() {
 				privateLinksReady := scope.PrivateLinksReady()
 				Expect(privateLinksReady).To(BeFalse())
 			})
+		})
+	})
+
+	Describe("setting private endpoint IP address in annotation", func() {
+		var azureCluster *capz.AzureCluster
+		var scope *privatelinks.Scope
+
+		BeforeEach(func() {
+			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).Build()
+			capzSchema, err := capz.SchemeBuilder.Build()
+			Expect(err).NotTo(HaveOccurred())
+			client := fake.NewClientBuilder().
+				WithScheme(capzSchema).
+				WithObjects(azureCluster).Build()
+			scope, err = privatelinks.NewScope(azureCluster, client)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("successfully sets private IP address in annotation", func() {
+			wantedKey := "key"
+			wantedValue := "value"
+			scope.SetAnnotation(wantedKey, wantedValue)
+			value, ok := azureCluster.Annotations[wantedKey]
+			Expect(ok).To(BeTrue())
+			Expect(value).To(Equal(wantedValue))
 		})
 	})
 })

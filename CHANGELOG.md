@@ -11,10 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `privatelinks` package with `Scope` object that is providing functionality to access and update private links info in AzureCluster CR.
-- Custom Makefile
-- CircleCI config
-- This changelog
+- Add `privatelinks` package with `Scope` object that is providing functionality to access and update private links info in AzureCluster CR.
+- Add custom Makefile
+- Add CircleCI config
+- Add this changelog
+- Add Helm chart
 
 ### Changed
 

@@ -42,3 +42,29 @@ workflows:
           # Trigger the job also on git tag.
           tags:
             only: /^v.*/
+
+    - architect/push-to-app-catalog:
+        context: "architect"
+        name: push-to-app-catalog
+        app_catalog: "control-plane-catalog"
+        app_catalog_test: "control-plane-test-catalog"
+        chart: "azure-private-endpoint-operator"
+        requires:
+        - push-azure-private-endpoint-operator-to-quay
+        # Trigger job on git tag.
+        filters:
+          tags:
+            only: /^v.*/
+
+    - architect/push-to-app-collection:
+        context: architect
+        name: push-to-capz-app-collection
+        app_name: "azure-private-endpoint-operator"
+        app_collection_repo: "capz-app-collection"
+        requires:
+        - push-to-app-catalog
+        filters:
+          branches:
+            ignore: /.*/
+          tags:
+            only: /^v.*/

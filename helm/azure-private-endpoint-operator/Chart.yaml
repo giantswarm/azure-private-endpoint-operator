@@ -1,0 +1,17 @@
+apiVersion: v2
+
+name: azure-private-endpoint-operator
+appVersion: "[[ .AppVersion ]]"
+version: "[[ .Version ]]"
+
+# Please describe what the app provides in a sentence or two.
+description: Operator for reconciling Azure Private Links in CAPZ workload clusters to Azure Private Endpoints in CAPZ management clusters
+
+home: https://github.com/giantswarm/azure-private-endpoint-operator
+# If you have an icon/logo, you should add it to https://github.com/giantswarm/web-assets
+# and set the final URL as a value here and uncomment.
+
+# icon: https://s.giantswarm.io/app-icons/example/1/light.svg
+annotations:
+  application.giantswarm.io/team: clippy
+  config.giantswarm.io/version: 1.x.x

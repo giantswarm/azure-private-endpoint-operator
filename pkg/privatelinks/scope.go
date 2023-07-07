@@ -1,0 +1,79 @@
+package privatelinks
+
+import (
+	"fmt"
+	"net"
+
+	"github.com/giantswarm/microerror"
+	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	"sigs.k8s.io/cluster-api-provider-azure/util/slice"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azurecluster"
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
+)
+
+const (
+	azurePrivateEndpointOperatorApiServerAnnotation string = "azure-private-endpoint-operator.giantswarm.io/private-link-apiserver-ip"
+)
+
+func NewScope(workloadCluster *capz.AzureCluster, client client.Client) (*Scope, error) {
+	if workloadCluster == nil {
+		return nil, microerror.Maskf(errors.InvalidConfigError, "workloadCluster must be set")
+	}
+	if client == nil {
+		return nil, microerror.Maskf(errors.InvalidConfigError, "client must be set")
+	}
+
+	baseScope, err := azurecluster.NewBaseScope(workloadCluster, client)
+	if err != nil {
+		return nil, microerror.Mask(err)
+	}
+
+	scope := Scope{
+		BaseScope:    *baseScope,
+		privateLinks: workloadCluster.Spec.NetworkSpec.APIServerLB.PrivateLinks,
+	}
+
+	return &scope, nil
+}
+
+type Scope struct {
+	azurecluster.BaseScope
+	privateLinks []capz.PrivateLink
+}
+
+func (s *Scope) LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLink, bool) {
+	for _, privateLink := range s.privateLinks {
+		currentPrivateLinkResourceID := fmt.Sprintf(
+			"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
+			s.GetSubscriptionID(),
+			s.GetResourceGroup(),
+			privateLink.Name)
+
+		if currentPrivateLinkResourceID == privateLinkResourceID {
+			return privateLink, true
+		}
+	}
+
+	return capz.PrivateLink{}, false
+}
+
+func (s *Scope) GetPrivateLinksWithAllowedSubscription(managementClusterSubscriptionID string) []capz.PrivateLink {
+	var privateLinksWhereMCSubscriptionIsAllowed []capz.PrivateLink
+	for _, privateLink := range s.privateLinks {
+		if slice.Contains(privateLink.AllowedSubscriptions, managementClusterSubscriptionID) {
+			privateLinksWhereMCSubscriptionIsAllowed = append(privateLinksWhereMCSubscriptionIsAllowed, privateLink)
+		}
+	}
+
+	return privateLinksWhereMCSubscriptionIsAllowed
+}
+
+func (s *Scope) PrivateLinksReady() bool {
+	return s.IsConditionTrue(capz.PrivateLinksReadyCondition)
+}
+
+func (s *Scope) SetPrivateEndpointIPAddress(ip net.IP) {
+	s.BaseScope.SetAnnotation(azurePrivateEndpointOperatorApiServerAnnotation, ip.String())
+}

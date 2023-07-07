@@ -1,0 +1,44 @@
+version: 2.1
+orbs:
+  architect: giantswarm/architect@4.28.1
+
+jobs:
+  unit-tests:
+    executor: architect/architect
+    steps:
+    - checkout
+    - run:
+        name: "Run unit tests"
+        command: CGO_ENABLED=0 make test-unit
+
+workflows:
+  package-and-push-chart-on-tag:
+    jobs:
+    - architect/go-build:
+        context: architect
+        name: go-build
+        binary: azure-private-endpoint-operator
+        resource_class: xlarge
+        filters:
+          tags:
+            only: /^v.*/
+
+    - unit-tests:
+        requires:
+        - go-build
+        filters:
+          tags:
+            only: /^v.*/
+
+    - architect/push-to-docker:
+        context: "architect"
+        name: push-azure-private-endpoint-operator-to-quay
+        image: "quay.io/giantswarm/azure-private-endpoint-operator"
+        username_envar: "QUAY_USERNAME"
+        password_envar: "QUAY_PASSWORD"
+        requires:
+        - unit-tests
+        filters:
+          # Trigger the job also on git tag.
+          tags:
+            only: /^v.*/

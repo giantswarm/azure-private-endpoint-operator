@@ -9,6 +9,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v2"
 	"github.com/giantswarm/microerror"
+	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -17,7 +18,23 @@ import (
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 )
 
-func NewScope(ctx context.Context, managementCluster *capz.AzureCluster, client client.Client, privateEndpointClient azure.PrivateEndpointsClient) (*scope, error) {
+// Scope is the interface for working with private endpoints.
+type Scope interface {
+	GetClusterName() types.NamespacedName
+	GetSubscriptionID() string
+	GetLocation() string
+	GetResourceGroup() string
+	GetPrivateEndpoints() []capz.PrivateEndpointSpec
+	GetPrivateEndpointsToWorkloadCluster(workloadClusterSubscriptionID, workloadClusterResourceGroup string) []capz.PrivateEndpointSpec
+	GetPrivateEndpointIPAddress(ctx context.Context, privateEndpointName string) (net.IP, error)
+	ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec) bool
+	AddPrivateEndpointSpec(capz.PrivateEndpointSpec)
+	RemovePrivateEndpointByName(string)
+	PatchObject(ctx context.Context) error
+	Close(ctx context.Context) error
+}
+
+func NewScope(ctx context.Context, managementCluster *capz.AzureCluster, client client.Client, privateEndpointClient azure.PrivateEndpointsClient) (Scope, error) {
 	if managementCluster == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "managementCluster must be set")
 	}

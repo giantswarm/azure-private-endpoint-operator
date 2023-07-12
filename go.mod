@@ -9,6 +9,7 @@ require (
 	github.com/giantswarm/microerror v0.4.0
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.8
+	go.uber.org/mock v0.2.0
 	k8s.io/api v0.25.11
 	k8s.io/apimachinery v0.25.11
 	k8s.io/client-go v0.25.11

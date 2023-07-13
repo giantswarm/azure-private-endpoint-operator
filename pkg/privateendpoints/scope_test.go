@@ -2,6 +2,7 @@ package privateendpoints_test
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -15,6 +16,11 @@ import (
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privateendpoints"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
+)
+
+const (
+	testPrivateEndpointNameSuffix = "test-private-endpoint"
+	testPrivateLinkNameSuffix     = "test-private-link"
 )
 
 var _ = Describe("Scope", func() {
@@ -38,7 +44,7 @@ var _ = Describe("Scope", func() {
 
 		BeforeEach(func() {
 			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
-				WithSubnet("test-subnet", capz.SubnetNode).
+				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 			capzSchema, err := capz.SchemeBuilder.Build()
 			Expect(err).NotTo(HaveOccurred())
@@ -84,8 +90,38 @@ var _ = Describe("Scope", func() {
 	})
 
 	Describe("getting private endpoints", func() {
+		var azureCluster *capz.AzureCluster
+		var client client.Client
+		var privateEndpointClient azure.PrivateEndpointsClient
+		var privateEndpointsCount int
+
+		BeforeEach(func(ctx context.Context) {
+			privateEndpointsCount = 3
+			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
+				WithSubnet("test-subnet", capz.SubnetNode, fakePrivateEndpoints(subscriptionID, resourceGroup, privateEndpointsCount)).
+				Build()
+			capzSchema, err := capz.SchemeBuilder.Build()
+			Expect(err).NotTo(HaveOccurred())
+			client = fake.NewClientBuilder().
+				WithScheme(capzSchema).
+				WithObjects(azureCluster).Build()
+			privateEndpointClient = mock_azure.NewMockPrivateEndpointsClient(gomockController)
+			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, privateEndpointClient)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		Describe("getting all private endpoints", func() {
-			// TBA
+			It("gets all private endpoints", func() {
+				privateEndpoints := scope.GetPrivateEndpoints()
+				Expect(len(privateEndpoints)).To(Equal(privateEndpointsCount))
+				for i := range privateEndpoints {
+					privateEndpoint := privateEndpoints[i]
+					Expect(privateEndpoint.Name).To(Equal(privateEndpointName(i)))
+					Expect(privateEndpoint.PrivateLinkServiceConnections).To(HaveLen(1))
+					Expect(privateEndpoint.PrivateLinkServiceConnections[0].Name).To(Equal(
+						testhelpers.FakePrivateLinkConnectionName(subscriptionID, resourceGroup, privateLinkName(i))))
+				}
+			})
 		})
 
 		Describe("getting private endpoints to a workload cluster", func() {
@@ -109,3 +145,27 @@ var _ = Describe("Scope", func() {
 		// TBA
 	})
 })
+
+func fakePrivateEndpoints(subscriptionID, resourceGroup string, privateEndpointsCount int) capz.PrivateEndpoints {
+	var privateEndpoints capz.PrivateEndpoints
+	for i := 0; i < privateEndpointsCount; i++ {
+		privateEndpoint := testhelpers.NewPrivateEndpointBuilder(privateEndpointName(i)).
+			WithPrivateLinkServiceConnection(subscriptionID, resourceGroup, privateLinkName(i)).
+			Build()
+		privateEndpoints = append(privateEndpoints, privateEndpoint)
+	}
+
+	return privateEndpoints
+}
+
+func privateEndpointName(index int) string {
+	return resourceName(testPrivateEndpointNameSuffix, index)
+}
+
+func privateLinkName(index int) string {
+	return resourceName(testPrivateLinkNameSuffix, index)
+}
+
+func resourceName(suffix string, index int) string {
+	return fmt.Sprintf("%s-%d", suffix, index)
+}

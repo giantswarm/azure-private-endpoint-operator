@@ -21,11 +21,12 @@ func NewAzureClusterBuilder(subscriptionID, resourceGroup string) *AzureClusterB
 	}
 }
 
-func (b *AzureClusterBuilder) WithSubnet(name string, role capz.SubnetRole) *AzureClusterBuilder {
+func (b *AzureClusterBuilder) WithSubnet(name string, role capz.SubnetRole, privateEndpoints capz.PrivateEndpoints) *AzureClusterBuilder {
 	b.subnets = append(b.subnets, capz.SubnetSpec{
 		SubnetClassSpec: capz.SubnetClassSpec{
-			Name: name,
-			Role: role,
+			Name:             name,
+			Role:             role,
+			PrivateEndpoints: privateEndpoints,
 		},
 	})
 	return b

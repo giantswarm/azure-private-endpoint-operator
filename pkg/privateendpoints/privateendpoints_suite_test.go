@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestPrivateendpoints(t *testing.T) {
+func TestPrivateEndpoints(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Privateendpoints Suite")
+	RunSpecs(t, "PrivateEndpoints Suite")
 }

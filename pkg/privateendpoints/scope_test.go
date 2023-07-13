@@ -110,22 +110,46 @@ var _ = Describe("Scope", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		Describe("getting all private endpoints", func() {
-			It("gets all private endpoints", func() {
-				privateEndpoints := scope.GetPrivateEndpoints()
-				Expect(len(privateEndpoints)).To(Equal(privateEndpointsCount))
-				for i := range privateEndpoints {
-					privateEndpoint := privateEndpoints[i]
-					Expect(privateEndpoint.Name).To(Equal(privateEndpointName(i)))
-					Expect(privateEndpoint.PrivateLinkServiceConnections).To(HaveLen(1))
-					Expect(privateEndpoint.PrivateLinkServiceConnections[0].Name).To(Equal(
-						testhelpers.FakePrivateLinkConnectionName(subscriptionID, resourceGroup, privateLinkName(i))))
-				}
-			})
+		It("gets all private endpoints", func() {
+			privateEndpoints := scope.GetPrivateEndpoints()
+			Expect(len(privateEndpoints)).To(Equal(privateEndpointsCount))
+			for i := range privateEndpoints {
+				privateEndpoint := privateEndpoints[i]
+				Expect(privateEndpoint.Name).To(Equal(privateEndpointName(i)))
+				Expect(privateEndpoint.PrivateLinkServiceConnections).To(HaveLen(1))
+				Expect(privateEndpoint.PrivateLinkServiceConnections[0].Name).To(Equal(
+					testhelpers.FakePrivateLinkConnectionName(subscriptionID, resourceGroup, privateLinkName(i))))
+			}
 		})
 
-		Describe("getting private endpoints to a workload cluster", func() {
-			// TBA
+		It("gets private endpoints to a workload cluster", func() {
+			// Add another set of private endpoints to private links in other resource group (other cluster)
+			otherResourceGroup := "other" // also cluster name
+			azureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints = append(
+				azureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints,
+				fakePrivateEndpoints(subscriptionID, otherResourceGroup, privateEndpointsCount)...)
+
+			// Check getting private endpoints to a workload cluster in "test-rg" resource group (initially added in BeforeEach)
+			privateEndpoints := scope.GetPrivateEndpointsToWorkloadCluster(subscriptionID, resourceGroup)
+			Expect(len(privateEndpoints)).To(Equal(privateEndpointsCount))
+			for i := range privateEndpoints {
+				privateEndpoint := privateEndpoints[i]
+				Expect(privateEndpoint.Name).To(Equal(privateEndpointName(i)))
+				Expect(privateEndpoint.PrivateLinkServiceConnections).To(HaveLen(1))
+				Expect(privateEndpoint.PrivateLinkServiceConnections[0].Name).To(Equal(
+					testhelpers.FakePrivateLinkConnectionName(subscriptionID, resourceGroup, privateLinkName(i))))
+			}
+
+			// Check getting private endpoints to a workload cluster in "other" resource group (newly added in this spec)
+			privateEndpoints = scope.GetPrivateEndpointsToWorkloadCluster(subscriptionID, otherResourceGroup)
+			Expect(len(privateEndpoints)).To(Equal(privateEndpointsCount))
+			for i := range privateEndpoints {
+				privateEndpoint := privateEndpoints[i]
+				Expect(privateEndpoint.Name).To(Equal(privateEndpointName(i)))
+				Expect(privateEndpoint.PrivateLinkServiceConnections).To(HaveLen(1))
+				Expect(privateEndpoint.PrivateLinkServiceConnections[0].Name).To(Equal(
+					testhelpers.FakePrivateLinkConnectionName(subscriptionID, otherResourceGroup, privateLinkName(i))))
+			}
 		})
 
 		Describe("getting a private endpoint IP address", func() {
@@ -146,11 +170,11 @@ var _ = Describe("Scope", func() {
 	})
 })
 
-func fakePrivateEndpoints(subscriptionID, resourceGroup string, privateEndpointsCount int) capz.PrivateEndpoints {
+func fakePrivateEndpoints(privateLinkSubscriptionID, privateLinkResourceGroup string, privateEndpointsCount int) capz.PrivateEndpoints {
 	var privateEndpoints capz.PrivateEndpoints
 	for i := 0; i < privateEndpointsCount; i++ {
 		privateEndpoint := testhelpers.NewPrivateEndpointBuilder(privateEndpointName(i)).
-			WithPrivateLinkServiceConnection(subscriptionID, resourceGroup, privateLinkName(i)).
+			WithPrivateLinkServiceConnection(privateLinkSubscriptionID, privateLinkResourceGroup, privateLinkName(i)).
 			Build()
 		privateEndpoints = append(privateEndpoints, privateEndpoint)
 	}

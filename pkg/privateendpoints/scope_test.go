@@ -152,11 +152,24 @@ var _ = Describe("Scope", func() {
 			}
 		})
 
-		Describe("getting a private endpoint IP address", func() {
-			// TBA
+		Describe("checking if the scope contains the specified private endpoint", func() {
+			It("returns true when the scope contains the specified  private endpoint", func() {
+				for i := 0; i < privateEndpointsCount; i++ {
+					contains := scope.ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec{
+						Name: privateEndpointName(i),
+					})
+					Expect(contains).To(BeTrue())
+				}
+			})
+			It("returns false when the scope doesn't contain the specified  private endpoint", func() {
+				contains := scope.ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec{
+					Name: "some-other-private-endpoint",
+				})
+				Expect(contains).To(BeFalse())
+			})
 		})
 
-		Describe("checking of scope contains a specified private endpoint", func() {
+		Describe("getting a private endpoint IP address", func() {
 			// TBA
 		})
 	})

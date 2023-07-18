@@ -29,12 +29,20 @@ var _ = Describe("Scope", func() {
 	var resourceGroup string
 	var gomockController *gomock.Controller
 	var scope privateendpoints.Scope
+	var privateEndpointNames []string
+	var privateEndpointsCount int
 
 	BeforeEach(func() {
 		subscriptionID = "1234"
 		resourceGroup = "test-rg"
 		gomockController = gomock.NewController(GinkgoT())
 		err = nil
+		privateEndpointNames = []string{
+			"test-private-endpoint-0",
+			"test-private-endpoint-1",
+			"test-private-endpoint-2",
+		}
+		privateEndpointsCount = len(privateEndpointNames)
 	})
 
 	Describe("creating scope", func() {
@@ -91,21 +99,17 @@ var _ = Describe("Scope", func() {
 
 	Describe("getting private endpoints", func() {
 		var azureCluster *capz.AzureCluster
-		var client client.Client
-		var privateEndpointClient azure.PrivateEndpointsClient
-		var privateEndpointsCount int
 
 		BeforeEach(func(ctx context.Context) {
-			privateEndpointsCount = 3
 			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
-				WithSubnet("test-subnet", capz.SubnetNode, fakePrivateEndpoints(subscriptionID, resourceGroup, privateEndpointsCount)).
+				WithSubnet("test-subnet", capz.SubnetNode, fakePrivateEndpoints(subscriptionID, resourceGroup, privateEndpointNames)).
 				Build()
 			capzSchema, err := capz.SchemeBuilder.Build()
 			Expect(err).NotTo(HaveOccurred())
-			client = fake.NewClientBuilder().
+			client := fake.NewClientBuilder().
 				WithScheme(capzSchema).
 				WithObjects(azureCluster).Build()
-			privateEndpointClient = mock_azure.NewMockPrivateEndpointsClient(gomockController)
+			privateEndpointClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
 			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, privateEndpointClient)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -115,7 +119,7 @@ var _ = Describe("Scope", func() {
 			Expect(len(privateEndpoints)).To(Equal(privateEndpointsCount))
 			for i := range privateEndpoints {
 				privateEndpoint := privateEndpoints[i]
-				Expect(privateEndpoint.Name).To(Equal(privateEndpointName(i)))
+				Expect(privateEndpoint.Name).To(Equal(privateEndpointNames[i]))
 				Expect(privateEndpoint.PrivateLinkServiceConnections).To(HaveLen(1))
 				Expect(privateEndpoint.PrivateLinkServiceConnections[0].Name).To(Equal(
 					testhelpers.FakePrivateLinkConnectionName(subscriptionID, resourceGroup, privateLinkName(i))))
@@ -127,14 +131,14 @@ var _ = Describe("Scope", func() {
 			otherResourceGroup := "other" // also cluster name
 			azureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints = append(
 				azureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints,
-				fakePrivateEndpoints(subscriptionID, otherResourceGroup, privateEndpointsCount)...)
+				fakePrivateEndpoints(subscriptionID, otherResourceGroup, privateEndpointNames)...)
 
 			// Check getting private endpoints to a workload cluster in "test-rg" resource group (initially added in BeforeEach)
 			privateEndpoints := scope.GetPrivateEndpointsToWorkloadCluster(subscriptionID, resourceGroup)
 			Expect(len(privateEndpoints)).To(Equal(privateEndpointsCount))
 			for i := range privateEndpoints {
 				privateEndpoint := privateEndpoints[i]
-				Expect(privateEndpoint.Name).To(Equal(privateEndpointName(i)))
+				Expect(privateEndpoint.Name).To(Equal(privateEndpointNames[i]))
 				Expect(privateEndpoint.PrivateLinkServiceConnections).To(HaveLen(1))
 				Expect(privateEndpoint.PrivateLinkServiceConnections[0].Name).To(Equal(
 					testhelpers.FakePrivateLinkConnectionName(subscriptionID, resourceGroup, privateLinkName(i))))
@@ -145,7 +149,7 @@ var _ = Describe("Scope", func() {
 			Expect(len(privateEndpoints)).To(Equal(privateEndpointsCount))
 			for i := range privateEndpoints {
 				privateEndpoint := privateEndpoints[i]
-				Expect(privateEndpoint.Name).To(Equal(privateEndpointName(i)))
+				Expect(privateEndpoint.Name).To(Equal(privateEndpointNames[i]))
 				Expect(privateEndpoint.PrivateLinkServiceConnections).To(HaveLen(1))
 				Expect(privateEndpoint.PrivateLinkServiceConnections[0].Name).To(Equal(
 					testhelpers.FakePrivateLinkConnectionName(subscriptionID, otherResourceGroup, privateLinkName(i))))
@@ -156,7 +160,7 @@ var _ = Describe("Scope", func() {
 			It("returns true when the scope contains the specified  private endpoint", func() {
 				for i := 0; i < privateEndpointsCount; i++ {
 					contains := scope.ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec{
-						Name: privateEndpointName(i),
+						Name: privateEndpointNames[i],
 					})
 					Expect(contains).To(BeTrue())
 				}
@@ -174,46 +178,74 @@ var _ = Describe("Scope", func() {
 		})
 	})
 
-	It("adds a private endpoint", func() {
-		// first check that the private endpoint does not exist in scope
-		testPrivateEndpointName := "some-other-private-endpoint"
-		contains := scope.ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec{
-			Name: testPrivateEndpointName,
+	Describe("adding and removing private endpoints", func() {
+		var azureCluster *capz.AzureCluster
+
+		BeforeEach(func(ctx context.Context) {
+			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
+				WithSubnet("test-subnet", capz.SubnetNode, fakePrivateEndpoints(subscriptionID, resourceGroup, privateEndpointNames)).
+				Build()
+			capzSchema, err := capz.SchemeBuilder.Build()
+			Expect(err).NotTo(HaveOccurred())
+			client := fake.NewClientBuilder().
+				WithScheme(capzSchema).
+				WithObjects(azureCluster).Build()
+			privateEndpointClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
+			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, privateEndpointClient)
+			Expect(err).NotTo(HaveOccurred())
 		})
-		Expect(contains).To(BeFalse())
 
-		// now add new private endpoint
-		privateEndpoint := testhelpers.NewPrivateEndpointBuilder(testPrivateEndpointName).
-			WithPrivateLinkServiceConnection(subscriptionID, resourceGroup, privateLinkName(0)).
-			Build()
-		scope.AddPrivateEndpointSpec(privateEndpoint)
+		It("adds a private endpoint", func() {
+			// first check that the private endpoint does not exist in scope
+			testPrivateEndpointName := "some-other-private-endpoint"
+			contains := scope.ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec{
+				Name: testPrivateEndpointName,
+			})
+			Expect(contains).To(BeFalse())
 
-		// and test again
-		contains = scope.ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec{
-			Name: testPrivateEndpointName,
+			// now add new private endpoint
+			privateEndpoint := testhelpers.NewPrivateEndpointBuilder(testPrivateEndpointName).
+				WithPrivateLinkServiceConnection(subscriptionID, resourceGroup, privateLinkName(0)).
+				Build()
+			scope.AddPrivateEndpointSpec(privateEndpoint)
+
+			// and test again
+			contains = scope.ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec{
+				Name: testPrivateEndpointName,
+			})
+			Expect(contains).To(BeTrue())
 		})
-		Expect(contains).To(BeTrue())
-	})
 
-	Describe("removing a private endpoint by name", func() {
-		// TBA
+		It("removes a private endpoint by name", func() {
+			// first check that the private endpoint exists in scope
+			testPrivateEndpointName := privateEndpointNames[1]
+			contains := scope.ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec{
+				Name: testPrivateEndpointName,
+			})
+			Expect(contains).To(BeTrue())
+
+			// now remove the private endpoint
+			scope.RemovePrivateEndpointByName(testPrivateEndpointName)
+
+			// and test again
+			contains = scope.ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec{
+				Name: testPrivateEndpointName,
+			})
+			Expect(contains).To(BeFalse())
+		})
 	})
 })
 
-func fakePrivateEndpoints(privateLinkSubscriptionID, privateLinkResourceGroup string, privateEndpointsCount int) capz.PrivateEndpoints {
+func fakePrivateEndpoints(privateLinkSubscriptionID, privateLinkResourceGroup string, privateEndpointNames []string) capz.PrivateEndpoints {
 	var privateEndpoints capz.PrivateEndpoints
-	for i := 0; i < privateEndpointsCount; i++ {
-		privateEndpoint := testhelpers.NewPrivateEndpointBuilder(privateEndpointName(i)).
+	for i, privateEndpointName := range privateEndpointNames {
+		privateEndpoint := testhelpers.NewPrivateEndpointBuilder(privateEndpointName).
 			WithPrivateLinkServiceConnection(privateLinkSubscriptionID, privateLinkResourceGroup, privateLinkName(i)).
 			Build()
 		privateEndpoints = append(privateEndpoints, privateEndpoint)
 	}
 
 	return privateEndpoints
-}
-
-func privateEndpointName(index int) string {
-	return resourceName(testPrivateEndpointNameSuffix, index)
 }
 
 func privateLinkName(index int) string {

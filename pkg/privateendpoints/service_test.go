@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure/mock_azure"
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privateendpoints"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privatelinks"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
@@ -27,7 +28,8 @@ var _ = Describe("Service", func() {
 	var err error
 	var subscriptionID string
 	var location string
-	var resourceGroup string
+	var mcResourceGroup string
+	var wcResourceGroup string
 	var managementAzureCluster *capz.AzureCluster
 	var workloadAzureCluster *capz.AzureCluster
 	var privateLinksScope privateendpoints.PrivateLinksScope
@@ -37,7 +39,55 @@ var _ = Describe("Service", func() {
 	BeforeEach(func() {
 		subscriptionID = "1234"
 		location = "westeurope"
-		resourceGroup = "test-rg"
+		mcResourceGroup = "test-mc-rg"
+		wcResourceGroup = "test-wc-rg"
+	})
+
+	When("workload cluster with private link has just been created and private links are still not ready", func() {
+		BeforeEach(func(ctx context.Context) {
+			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+				WithLocation(location).
+				WithSubnet("test-subnet", capz.SubnetNode, nil).
+				Build()
+
+			// WC AzureClusterResource
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
+					WithAllowedSubscription(subscriptionID).
+					Build()).
+				Build()
+
+			// Kubernetes client
+			capzSchema, err := capz.SchemeBuilder.Build()
+			Expect(err).NotTo(HaveOccurred())
+			client := fake.NewClientBuilder().
+				WithScheme(capzSchema).
+				WithObjects(managementAzureCluster, workloadAzureCluster).
+				Build()
+
+			// Azure private endpoints mock client
+			gomockController := gomock.NewController(GinkgoT())
+			privateEndpointClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
+
+			// Private endpoints scope
+			privateEndpointsScope, err = privateendpoints.NewScope(ctx, managementAzureCluster, client, privateEndpointClient)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Private links scope
+			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Private endpoints service
+			service, err = privateendpoints.NewService(privateEndpointsScope, privateLinksScope)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("returns PrivateLinksNotReady error", func(ctx context.Context) {
+			err = service.Reconcile(ctx)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsPrivateLinksNotReady(err)).To(BeTrue())
+		})
 	})
 
 	When("workload cluster with private link has just been created and private links are ready", func() {
@@ -47,13 +97,13 @@ var _ = Describe("Service", func() {
 
 		BeforeEach(func(ctx context.Context) {
 			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
 			// WC AzureClusterResource
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
@@ -65,7 +115,8 @@ var _ = Describe("Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
 				WithScheme(capzSchema).
-				WithObjects(managementAzureCluster).Build()
+				WithObjects(managementAzureCluster, workloadAzureCluster).
+				Build()
 
 			// Azure private endpoints mock client
 			gomockController := gomock.NewController(GinkgoT())
@@ -76,7 +127,7 @@ var _ = Describe("Service", func() {
 				EXPECT().
 				Get(
 					gomock.Any(),
-					gomock.Eq(resourceGroup),
+					gomock.Eq(mcResourceGroup),
 					gomock.Eq(expectedPrivateEndpointName),
 					gomock.Eq(&armnetwork.PrivateEndpointsClientGetOptions{
 						Expand: to.Ptr[string]("NetworkInterfaces"),
@@ -124,7 +175,7 @@ var _ = Describe("Service", func() {
 						PrivateLinkServiceID: fmt.Sprintf(
 							"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
 							subscriptionID,
-							resourceGroup,
+							wcResourceGroup,
 							testPrivateLinkName),
 						RequestMessage: "",
 					},
@@ -154,11 +205,4 @@ var _ = Describe("Service", func() {
 	//	})
 	//})
 	//
-	//When("there workload cluster private links are not ready", func() {
-	//	It("returns SubscriptionCannotConnectToPrivateLink error", func(ctx context.Context) {
-	//		err = service.Reconcile(ctx)
-	//		Expect(err).To(HaveOccurred())
-	//		Expect(errors.IsPrivateLinksNotReady(err)).To(BeTrue())
-	//	})
-	//})
 })

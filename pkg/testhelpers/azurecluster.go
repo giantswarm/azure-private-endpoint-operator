@@ -53,7 +53,7 @@ func (b *AzureClusterBuilder) WithCondition(condition *capi.Condition) *AzureClu
 func (b *AzureClusterBuilder) Build() *capz.AzureCluster {
 	azureCluster := capz.AzureCluster{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      "test-cluster",
+			Name:      b.resourceGroup,
 			Namespace: "org-giantswarm",
 		},
 		Spec: capz.AzureClusterSpec{

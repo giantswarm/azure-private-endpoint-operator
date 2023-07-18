@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	testPrivateEndpointNameSuffix = "test-private-endpoint"
-	testPrivateLinkNameSuffix     = "test-private-link"
+	testPrivateEndpointName   = "test-private-endpoint"
+	testPrivateLinkNameSuffix = "test-private-link"
 )
 
 var _ = Describe("Scope", func() {
@@ -260,13 +260,12 @@ var _ = Describe("Scope", func() {
 
 		It("gets PrivateEndpointNetworkInterfaceNotFoundError error when private endpoint does not have network interfaces", func(ctx context.Context) {
 			// setup Azure client mock
-			privateEndpointName := "test-private-endpoint"
 			privateEndpointClient.
 				EXPECT().
 				Get(
 					gomock.Eq(ctx),
 					gomock.Eq(resourceGroup),
-					gomock.Eq(privateEndpointName),
+					gomock.Eq(testPrivateEndpointName),
 					gomock.Eq(&armnetwork.PrivateEndpointsClientGetOptions{
 						Expand: to.Ptr[string]("NetworkInterfaces"),
 					})).
@@ -279,20 +278,19 @@ var _ = Describe("Scope", func() {
 				}, nil)
 
 			// test scope
-			_, err := scope.GetPrivateEndpointIPAddress(ctx, privateEndpointName)
+			_, err := scope.GetPrivateEndpointIPAddress(ctx, testPrivateEndpointName)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsPrivateEndpointNetworkInterfaceNotFound(err)).To(BeTrue())
 		})
 
 		It("gets PrivateEndpointNetworkInterfacePrivateAddressNotFoundError error when private endpoint network interfaces does not have a private IP address", func(ctx context.Context) {
 			// setup Azure client mock
-			privateEndpointName := "test-private-endpoint"
 			privateEndpointClient.
 				EXPECT().
 				Get(
 					gomock.Eq(ctx),
 					gomock.Eq(resourceGroup),
-					gomock.Eq(privateEndpointName),
+					gomock.Eq(testPrivateEndpointName),
 					gomock.Eq(&armnetwork.PrivateEndpointsClientGetOptions{
 						Expand: to.Ptr[string]("NetworkInterfaces"),
 					})).
@@ -317,7 +315,7 @@ var _ = Describe("Scope", func() {
 				}, nil)
 
 			// test scope
-			_, err := scope.GetPrivateEndpointIPAddress(ctx, privateEndpointName)
+			_, err := scope.GetPrivateEndpointIPAddress(ctx, testPrivateEndpointName)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsPrivateEndpointNetworkInterfacePrivateAddressNotFound(err)).To(BeTrue())
 		})

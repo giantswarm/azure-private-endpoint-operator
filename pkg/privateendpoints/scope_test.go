@@ -3,7 +3,10 @@ package privateendpoints_test
 import (
 	"context"
 	"fmt"
+	"net"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v2"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
@@ -28,6 +31,7 @@ var _ = Describe("Scope", func() {
 	var subscriptionID string
 	var resourceGroup string
 	var gomockController *gomock.Controller
+	var privateEndpointClient *mock_azure.MockPrivateEndpointsClient
 	var scope privateendpoints.Scope
 	var privateEndpointNames []string
 	var privateEndpointsCount int
@@ -109,7 +113,7 @@ var _ = Describe("Scope", func() {
 			client := fake.NewClientBuilder().
 				WithScheme(capzSchema).
 				WithObjects(azureCluster).Build()
-			privateEndpointClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
+			privateEndpointClient = mock_azure.NewMockPrivateEndpointsClient(gomockController)
 			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, privateEndpointClient)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -173,8 +177,43 @@ var _ = Describe("Scope", func() {
 			})
 		})
 
-		Describe("getting a private endpoint IP address", func() {
-			// TBA
+		It("gets the private endpoint's IP address", func(ctx context.Context) {
+			// setup Azure client mock
+			privateEndpointName := "test-private-endpoint"
+			expectedPrivateIpString := "10.10.10.10"
+			privateEndpointClient.
+				EXPECT().
+				Get(
+					gomock.Eq(ctx),
+					gomock.Eq(resourceGroup),
+					gomock.Eq(privateEndpointName),
+					gomock.Eq(&armnetwork.PrivateEndpointsClientGetOptions{
+						Expand: to.Ptr[string]("NetworkInterfaces"),
+					})).
+				Return(armnetwork.PrivateEndpointsClientGetResponse{
+					PrivateEndpoint: armnetwork.PrivateEndpoint{
+						Properties: &armnetwork.PrivateEndpointProperties{
+							NetworkInterfaces: []*armnetwork.Interface{
+								{
+									Properties: &armnetwork.InterfacePropertiesFormat{
+										IPConfigurations: []*armnetwork.InterfaceIPConfiguration{
+											{
+												Properties: &armnetwork.InterfaceIPConfigurationPropertiesFormat{
+													PrivateIPAddress: to.Ptr(expectedPrivateIpString),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}, nil)
+
+			// test scope
+			privateEndpointIpAddress, err := scope.GetPrivateEndpointIPAddress(ctx, privateEndpointName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(privateEndpointIpAddress).To(Equal(net.ParseIP(expectedPrivateIpString)))
 		})
 	})
 

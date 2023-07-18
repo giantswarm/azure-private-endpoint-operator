@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v2"
 	. "github.com/onsi/ginkgo/v2"
@@ -176,6 +178,24 @@ var _ = Describe("Scope", func() {
 				Expect(contains).To(BeFalse())
 			})
 		})
+	})
+
+	Describe("getting private endpoint properties", func() {
+		var azureCluster *capz.AzureCluster
+
+		BeforeEach(func(ctx context.Context) {
+			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
+				WithSubnet("test-subnet", capz.SubnetNode, fakePrivateEndpoints(subscriptionID, resourceGroup, privateEndpointNames)).
+				Build()
+			capzSchema, err := capz.SchemeBuilder.Build()
+			Expect(err).NotTo(HaveOccurred())
+			client := fake.NewClientBuilder().
+				WithScheme(capzSchema).
+				WithObjects(azureCluster).Build()
+			privateEndpointClient = mock_azure.NewMockPrivateEndpointsClient(gomockController)
+			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, privateEndpointClient)
+			Expect(err).NotTo(HaveOccurred())
+		})
 
 		It("gets the private endpoint's IP address", func(ctx context.Context) {
 			// setup Azure client mock
@@ -214,6 +234,92 @@ var _ = Describe("Scope", func() {
 			privateEndpointIpAddress, err := scope.GetPrivateEndpointIPAddress(ctx, privateEndpointName)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(privateEndpointIpAddress).To(Equal(net.ParseIP(expectedPrivateIpString)))
+		})
+
+		It("gets PrivateEndpointNotFound error when private endpoint does not exist", func(ctx context.Context) {
+			// setup Azure client mock
+			privateEndpointName := "test-private-endpoint"
+			privateEndpointClient.
+				EXPECT().
+				Get(
+					gomock.Eq(ctx),
+					gomock.Eq(resourceGroup),
+					gomock.Eq(privateEndpointName),
+					gomock.Eq(&armnetwork.PrivateEndpointsClientGetOptions{
+						Expand: to.Ptr[string]("NetworkInterfaces"),
+					})).
+				Return(armnetwork.PrivateEndpointsClientGetResponse{}, &azcore.ResponseError{
+					StatusCode: http.StatusNotFound,
+				})
+
+			// test scope
+			_, err := scope.GetPrivateEndpointIPAddress(ctx, privateEndpointName)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsPrivateEndpointNotFound(err)).To(BeTrue())
+		})
+
+		It("gets PrivateEndpointNetworkInterfaceNotFoundError error when private endpoint does not have network interfaces", func(ctx context.Context) {
+			// setup Azure client mock
+			privateEndpointName := "test-private-endpoint"
+			privateEndpointClient.
+				EXPECT().
+				Get(
+					gomock.Eq(ctx),
+					gomock.Eq(resourceGroup),
+					gomock.Eq(privateEndpointName),
+					gomock.Eq(&armnetwork.PrivateEndpointsClientGetOptions{
+						Expand: to.Ptr[string]("NetworkInterfaces"),
+					})).
+				Return(armnetwork.PrivateEndpointsClientGetResponse{
+					PrivateEndpoint: armnetwork.PrivateEndpoint{
+						Properties: &armnetwork.PrivateEndpointProperties{
+							NetworkInterfaces: []*armnetwork.Interface{},
+						},
+					},
+				}, nil)
+
+			// test scope
+			_, err := scope.GetPrivateEndpointIPAddress(ctx, privateEndpointName)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsPrivateEndpointNetworkInterfaceNotFound(err)).To(BeTrue())
+		})
+
+		It("gets PrivateEndpointNetworkInterfacePrivateAddressNotFoundError error when private endpoint network interfaces does not have a private IP address", func(ctx context.Context) {
+			// setup Azure client mock
+			privateEndpointName := "test-private-endpoint"
+			privateEndpointClient.
+				EXPECT().
+				Get(
+					gomock.Eq(ctx),
+					gomock.Eq(resourceGroup),
+					gomock.Eq(privateEndpointName),
+					gomock.Eq(&armnetwork.PrivateEndpointsClientGetOptions{
+						Expand: to.Ptr[string]("NetworkInterfaces"),
+					})).
+				Return(armnetwork.PrivateEndpointsClientGetResponse{
+					PrivateEndpoint: armnetwork.PrivateEndpoint{
+						Properties: &armnetwork.PrivateEndpointProperties{
+							NetworkInterfaces: []*armnetwork.Interface{
+								{
+									Properties: &armnetwork.InterfacePropertiesFormat{
+										IPConfigurations: []*armnetwork.InterfaceIPConfiguration{
+											{
+												Properties: &armnetwork.InterfaceIPConfigurationPropertiesFormat{
+													PublicIPAddress: &armnetwork.PublicIPAddress{},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}, nil)
+
+			// test scope
+			_, err := scope.GetPrivateEndpointIPAddress(ctx, privateEndpointName)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsPrivateEndpointNetworkInterfacePrivateAddressNotFound(err)).To(BeTrue())
 		})
 	})
 

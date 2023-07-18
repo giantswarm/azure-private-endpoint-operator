@@ -174,8 +174,25 @@ var _ = Describe("Scope", func() {
 		})
 	})
 
-	Describe("adding a private endpoint", func() {
-		// TBA
+	It("adds a private endpoint", func() {
+		// first check that the private endpoint does not exist in scope
+		testPrivateEndpointName := "some-other-private-endpoint"
+		contains := scope.ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec{
+			Name: testPrivateEndpointName,
+		})
+		Expect(contains).To(BeFalse())
+
+		// now add new private endpoint
+		privateEndpoint := testhelpers.NewPrivateEndpointBuilder(testPrivateEndpointName).
+			WithPrivateLinkServiceConnection(subscriptionID, resourceGroup, privateLinkName(0)).
+			Build()
+		scope.AddPrivateEndpointSpec(privateEndpoint)
+
+		// and test again
+		contains = scope.ContainsPrivateEndpointSpec(capz.PrivateEndpointSpec{
+			Name: testPrivateEndpointName,
+		})
+		Expect(contains).To(BeTrue())
 	})
 
 	Describe("removing a private endpoint by name", func() {

@@ -4,9 +4,13 @@ go 1.19
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.4.0
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.2.1
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v2 v2.2.1
 	github.com/giantswarm/microerror v0.4.0
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.8
+	go.uber.org/mock v0.2.0
+	k8s.io/api v0.25.11
 	k8s.io/apimachinery v0.25.11
 	k8s.io/client-go v0.25.11
 	sigs.k8s.io/cluster-api v1.3.5
@@ -17,7 +21,6 @@ require (
 require (
 	cloud.google.com/go v0.97.0 // indirect
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.2.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.2.0 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.28 // indirect
@@ -92,7 +95,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.25.11 // indirect
 	k8s.io/apiextensions-apiserver v0.25.11 // indirect
 	k8s.io/component-base v0.25.11 // indirect
 	k8s.io/klog/v2 v2.80.1 // indirect

@@ -43,8 +43,9 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen mockgen ## Generate go code.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	go generate ./...
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -163,6 +164,12 @@ GINKGO = $(shell pwd)/bin/ginkgo
 .PHONY: ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
 	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@latest)
+
+MOCKGEN_BIN = mockgen
+MOCKGEN = $(shell pwd)/bin/$(MOCKGEN_BIN)-$(MOCKGEN_VER)
+.PHONY: mockgen
+mockgen: ## Download mockgen locally if necessary.
+	$(call go-get-tool,$(MOCKGEN),go.uber.org/mock/mockgen@latest)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))

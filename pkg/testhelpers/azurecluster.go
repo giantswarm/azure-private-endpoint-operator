@@ -9,6 +9,7 @@ import (
 type AzureClusterBuilder struct {
 	subscriptionID string
 	resourceGroup  string
+	subnets        capz.Subnets
 	privateLinks   []capz.PrivateLink
 	conditions     capi.Conditions
 }
@@ -18,6 +19,17 @@ func NewAzureClusterBuilder(subscriptionID, resourceGroup string) *AzureClusterB
 		subscriptionID: subscriptionID,
 		resourceGroup:  resourceGroup,
 	}
+}
+
+func (b *AzureClusterBuilder) WithSubnet(name string, role capz.SubnetRole, privateEndpoints capz.PrivateEndpoints) *AzureClusterBuilder {
+	b.subnets = append(b.subnets, capz.SubnetSpec{
+		SubnetClassSpec: capz.SubnetClassSpec{
+			Name:             name,
+			Role:             role,
+			PrivateEndpoints: privateEndpoints,
+		},
+	})
+	return b
 }
 
 func (b *AzureClusterBuilder) WithPrivateLink(privateLink capz.PrivateLink) *AzureClusterBuilder {
@@ -47,6 +59,7 @@ func (b *AzureClusterBuilder) Build() *capz.AzureCluster {
 				APIServerLB: capz.LoadBalancerSpec{
 					PrivateLinks: b.privateLinks,
 				},
+				Subnets: b.subnets,
 			},
 		},
 		Status: capz.AzureClusterStatus{

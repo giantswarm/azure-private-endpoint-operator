@@ -193,7 +193,7 @@ var _ = Describe("Service", func() {
 				mcResourceGroup,
 				expectedPrivateEndpointName)
 
-			expectedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, expectedPrivateEndpointName, testPrivateLinkName)
+			expectedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, testPrivateLinkName)
 
 			// private endpoint does not exist yet
 			exists := privateEndpointsScope.ContainsPrivateEndpointSpec(expectedPrivateEndpoint)
@@ -224,7 +224,7 @@ var _ = Describe("Service", func() {
 				expectedPrivateEndpointName,
 				expectedPrivateEndpointIp)
 
-			expectedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, expectedPrivateEndpointName, testPrivateLinkName)
+			expectedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, testPrivateLinkName)
 
 			// private endpoint does not exist yet
 			exists := privateEndpointsScope.ContainsPrivateEndpointSpec(expectedPrivateEndpoint)
@@ -249,7 +249,7 @@ var _ = Describe("Service", func() {
 		BeforeEach(func(ctx context.Context) {
 			// MC AzureCluster resource with private endpoints, as the WC has already been reconciled
 			expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
-			privateEndpoints := capz.PrivateEndpoints{expectedPrivateEndpointSpec(location, subscriptionID, mcResourceGroup, expectedPrivateEndpointName, testPrivateLinkName)}
+			privateEndpoints := capz.PrivateEndpoints{expectedPrivateEndpointSpec(location, subscriptionID, mcResourceGroup, testPrivateLinkName)}
 			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
@@ -294,8 +294,7 @@ var _ = Describe("Service", func() {
 		})
 
 		It("reconciles in an idempotent way, so new private endpoint is not added", func(ctx context.Context) {
-			expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
-			expectedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, expectedPrivateEndpointName, testPrivateLinkName)
+			expectedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, testPrivateLinkName)
 
 			// private endpoint already exists
 			exists := privateEndpointsScope.ContainsPrivateEndpointSpec(expectedPrivateEndpoint)
@@ -325,8 +324,8 @@ var _ = Describe("Service", func() {
 			expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
 			removedPrivateLinkName = "another-private-link"
 			privateEndpoints := capz.PrivateEndpoints{
-				expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, expectedPrivateEndpointName, testPrivateLinkName),
-				expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, expectedPrivateEndpointName, removedPrivateLinkName),
+				expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, testPrivateLinkName),
+				expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, removedPrivateLinkName),
 			}
 			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
 				WithLocation(location).
@@ -372,8 +371,8 @@ var _ = Describe("Service", func() {
 		})
 
 		It("removes corresponding private endpoint from the management cluster", func(ctx context.Context) {
-			removedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, "", removedPrivateLinkName)
-			presentPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, "", testPrivateLinkName)
+			removedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, removedPrivateLinkName)
+			presentPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, testPrivateLinkName)
 
 			// there are two private endpoints in the MC AzureCluster
 			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(2))
@@ -404,7 +403,7 @@ var _ = Describe("Service", func() {
 	When("workload cluster has been deleted", func() {
 		BeforeEach(func(ctx context.Context) {
 			// MC AzureCluster resource with private endpoints, as the WC has already been reconciled
-			privateEndpoints := capz.PrivateEndpoints{expectedPrivateEndpointSpec(location, subscriptionID, mcResourceGroup, "", testPrivateLinkName)}
+			privateEndpoints := capz.PrivateEndpoints{expectedPrivateEndpointSpec(location, subscriptionID, mcResourceGroup, testPrivateLinkName)}
 			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
@@ -444,7 +443,7 @@ var _ = Describe("Service", func() {
 		})
 
 		It("removes private endpoint from the management cluster", func(ctx context.Context) {
-			removedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, "", testPrivateLinkName)
+			removedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, testPrivateLinkName)
 
 			// initially there is one private endpoint in the MC AzureCluster
 			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(1))
@@ -467,7 +466,7 @@ var _ = Describe("Service", func() {
 	})
 })
 
-func expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, expectedPrivateEndpointName, privateLinkName string) capz.PrivateEndpointSpec {
+func expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, privateLinkName string) capz.PrivateEndpointSpec {
 	privateEndpointSpec := testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-privateendpoint", privateLinkName)).
 		WithLocation(location).
 		WithPrivateLinkServiceConnection(subscriptionID, wcResourceGroup, privateLinkName).

@@ -8,6 +8,7 @@ import (
 
 type PrivateEndpointBuilder struct {
 	name                          string
+	location                      string
 	privateLinkServiceConnections []capz.PrivateLinkServiceConnection
 }
 
@@ -15,6 +16,11 @@ func NewPrivateEndpointBuilder(name string) *PrivateEndpointBuilder {
 	return &PrivateEndpointBuilder{
 		name: name,
 	}
+}
+
+func (b *PrivateEndpointBuilder) WithLocation(location string) *PrivateEndpointBuilder {
+	b.location = location
+	return b
 }
 
 func (b *PrivateEndpointBuilder) WithPrivateLinkServiceConnection(subscriptionID, resourceGroup, privateLinkName string) *PrivateEndpointBuilder {
@@ -32,6 +38,7 @@ func (b *PrivateEndpointBuilder) WithPrivateLinkServiceConnection(subscriptionID
 func (b *PrivateEndpointBuilder) Build() capz.PrivateEndpointSpec {
 	privateEndpoint := capz.PrivateEndpointSpec{
 		Name:                          b.name,
+		Location:                      b.location,
 		PrivateLinkServiceConnections: b.privateLinkServiceConnections,
 	}
 

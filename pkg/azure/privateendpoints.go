@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type PrivateEndpointsClientCreator func(context.Context, client.Client, *capz.AzureCluster) (*armnetwork.PrivateEndpointsClient, error)
+type PrivateEndpointsClientCreator func(context.Context, client.Client, *capz.AzureCluster) (PrivateEndpointsClient, error)
 
 type PrivateEndpointsClient interface {
 	Get(ctx context.Context, resourceGroupName string, privateEndpointName string, options *armnetwork.PrivateEndpointsClientGetOptions) (armnetwork.PrivateEndpointsClientGetResponse, error)
@@ -23,7 +23,7 @@ const (
 	clientSecretKeyName = "clientSecret"
 )
 
-func NewPrivateEndpointClient(ctx context.Context, client client.Client, azureCluster *capz.AzureCluster) (*armnetwork.PrivateEndpointsClient, error) {
+func NewPrivateEndpointClient(ctx context.Context, client client.Client, azureCluster *capz.AzureCluster) (PrivateEndpointsClient, error) {
 	var cred azcore.TokenCredential
 	var err error
 

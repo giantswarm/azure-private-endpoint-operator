@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	azurePrivateEndpointOperatorApiServerAnnotation string = "azure-private-endpoint-operator.giantswarm.io/private-link-apiserver-ip"
+	AzurePrivateEndpointOperatorApiServerAnnotation string = "azure-private-endpoint-operator.giantswarm.io/private-link-apiserver-ip"
 )
 
 func NewScope(workloadCluster *capz.AzureCluster, client client.Client) (*Scope, error) {
@@ -75,5 +75,5 @@ func (s *Scope) PrivateLinksReady() bool {
 }
 
 func (s *Scope) SetPrivateEndpointIPAddress(ip net.IP) {
-	s.BaseScope.SetAnnotation(azurePrivateEndpointOperatorApiServerAnnotation, ip.String())
+	s.BaseScope.SetAnnotation(AzurePrivateEndpointOperatorApiServerAnnotation, ip.String())
 }

@@ -32,6 +32,7 @@ var _ = Describe("Service", func() {
 	var wcResourceGroup string
 	var managementAzureCluster *capz.AzureCluster
 	var workloadAzureCluster *capz.AzureCluster
+	var privateEndpointClient *mock_azure.MockPrivateEndpointsClient
 	var privateLinksScope privateendpoints.PrivateLinksScope
 	var privateEndpointsScope privateendpoints.Scope
 	var service *privateendpoints.Service
@@ -169,37 +170,7 @@ var _ = Describe("Service", func() {
 
 			// Azure private endpoints mock client
 			gomockController := gomock.NewController(GinkgoT())
-			privateEndpointClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
-			expectedPrivateEndpointName := fmt.Sprintf("%s-%s", testPrivateLinkName, "privateendpoint")
-			expectedPrivateIpString := "10.10.10.10"
-			privateEndpointClient.
-				EXPECT().
-				Get(
-					gomock.Any(),
-					gomock.Eq(mcResourceGroup),
-					gomock.Eq(expectedPrivateEndpointName),
-					gomock.Eq(&armnetwork.PrivateEndpointsClientGetOptions{
-						Expand: to.Ptr[string]("NetworkInterfaces"),
-					})).
-				Return(armnetwork.PrivateEndpointsClientGetResponse{
-					PrivateEndpoint: armnetwork.PrivateEndpoint{
-						Properties: &armnetwork.PrivateEndpointProperties{
-							NetworkInterfaces: []*armnetwork.Interface{
-								{
-									Properties: &armnetwork.InterfacePropertiesFormat{
-										IPConfigurations: []*armnetwork.InterfaceIPConfiguration{
-											{
-												Properties: &armnetwork.InterfaceIPConfigurationPropertiesFormat{
-													PrivateIPAddress: to.Ptr(expectedPrivateIpString),
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				}, nil)
+			privateEndpointClient = mock_azure.NewMockPrivateEndpointsClient(gomockController)
 
 			// Private endpoints scope
 			privateEndpointsScope, err = privateendpoints.NewScope(ctx, managementAzureCluster, client, privateEndpointClient)
@@ -214,23 +185,14 @@ var _ = Describe("Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("creates a new private endpoint for the private link", func(ctx context.Context) {
-			expectedPrivateEndpoint := capz.PrivateEndpointSpec{
-				Name:     fmt.Sprintf("%s-privateendpoint", testPrivateLinkName),
-				Location: location,
-				PrivateLinkServiceConnections: []capz.PrivateLinkServiceConnection{
-					{
-						Name: fmt.Sprintf("%s-connection", testPrivateLinkName),
-						PrivateLinkServiceID: fmt.Sprintf(
-							"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
-							subscriptionID,
-							wcResourceGroup,
-							testPrivateLinkName),
-						RequestMessage: "",
-					},
-				},
-				ManualApproval: false,
-			}
+		It("creates a new private endpoint for the private link, but still doesn't know the private endpoint IP", func(ctx context.Context) {
+			expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
+			setupPrivateEndpointClientWithoutPrivateIp(
+				privateEndpointClient,
+				mcResourceGroup,
+				expectedPrivateEndpointName)
+
+			expectedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, expectedPrivateEndpointName)
 
 			// private endpoint does not exist yet
 			exists := privateEndpointsScope.ContainsPrivateEndpointSpec(expectedPrivateEndpoint)
@@ -238,11 +200,115 @@ var _ = Describe("Service", func() {
 
 			// Reconcile newly created workload cluster
 			err = service.Reconcile(ctx)
-			Expect(err).NotTo(HaveOccurred())
 
 			// private endpoint now exists
 			exists = privateEndpointsScope.ContainsPrivateEndpointSpec(expectedPrivateEndpoint)
 			Expect(exists).To(BeTrue())
+
+			// A retriable error has occurred because the private endpoint IP is still not set
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsPrivateEndpointNetworkInterfacePrivateAddressNotFound(err))
+			Expect(errors.IsRetriable(err))
+			// since the private endpoint IP is still not set, then the private endpoint IP annotation is also not set
+			_, ok := workloadAzureCluster.Annotations[privatelinks.AzurePrivateEndpointOperatorApiServerAnnotation]
+			Expect(ok).To(BeFalse())
+		})
+
+		It("creates a new private endpoint for the private link, and sets the private endpoint IP annotation", func(ctx context.Context) {
+			expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
+			expectedPrivateEndpointIp := "10.10.10.10"
+			setupPrivateEndpointClientToReturnPrivateIp(
+				privateEndpointClient,
+				mcResourceGroup,
+				expectedPrivateEndpointName,
+				expectedPrivateEndpointIp)
+
+			expectedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, expectedPrivateEndpointName)
+
+			// private endpoint does not exist yet
+			exists := privateEndpointsScope.ContainsPrivateEndpointSpec(expectedPrivateEndpoint)
+			Expect(exists).To(BeFalse())
+
+			// reconcile newly created workload cluster
+			err = service.Reconcile(ctx)
+			Expect(err).NotTo(HaveOccurred())
+
+			// private endpoint exists
+			exists = privateEndpointsScope.ContainsPrivateEndpointSpec(expectedPrivateEndpoint)
+			Expect(exists).To(BeTrue())
+
+			// since the private endpoint IP is set, then the private endpoint IP annotation is set
+			privateEndpointIpAnnotation, ok := workloadAzureCluster.Annotations[privatelinks.AzurePrivateEndpointOperatorApiServerAnnotation]
+			Expect(ok).To(BeTrue())
+			Expect(privateEndpointIpAnnotation).To(Equal(expectedPrivateEndpointIp))
 		})
 	})
 })
+
+func expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, expectedPrivateEndpointName string) capz.PrivateEndpointSpec {
+	return capz.PrivateEndpointSpec{
+		Name:     expectedPrivateEndpointName,
+		Location: location,
+		PrivateLinkServiceConnections: []capz.PrivateLinkServiceConnection{
+			{
+				Name: fmt.Sprintf("%s-connection", testPrivateLinkName),
+				PrivateLinkServiceID: fmt.Sprintf(
+					"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
+					subscriptionID,
+					wcResourceGroup,
+					testPrivateLinkName),
+				RequestMessage: "",
+			},
+		},
+		ManualApproval: false,
+	}
+}
+
+func setupPrivateEndpointClientWithoutPrivateIp(
+	privateEndpointClient *mock_azure.MockPrivateEndpointsClient,
+	mcResourceGroup string,
+	expectedPrivateEndpointName string) {
+	setupPrivateEndpointClientToReturnPrivateIp(privateEndpointClient, mcResourceGroup, expectedPrivateEndpointName, "")
+}
+
+func setupPrivateEndpointClientToReturnPrivateIp(
+	privateEndpointClient *mock_azure.MockPrivateEndpointsClient,
+	mcResourceGroup string,
+	expectedPrivateEndpointName string,
+	expectedPrivateIpString string) {
+
+	var ipConfigurations []*armnetwork.InterfaceIPConfiguration
+
+	if expectedPrivateIpString != "" {
+		ipConfigurations = []*armnetwork.InterfaceIPConfiguration{
+			{
+				Properties: &armnetwork.InterfaceIPConfigurationPropertiesFormat{
+					PrivateIPAddress: to.Ptr(expectedPrivateIpString),
+				},
+			},
+		}
+	}
+
+	privateEndpointClient.
+		EXPECT().
+		Get(
+			gomock.Any(),
+			gomock.Eq(mcResourceGroup),
+			gomock.Eq(expectedPrivateEndpointName),
+			gomock.Eq(&armnetwork.PrivateEndpointsClientGetOptions{
+				Expand: to.Ptr[string]("NetworkInterfaces"),
+			})).
+		Return(armnetwork.PrivateEndpointsClientGetResponse{
+			PrivateEndpoint: armnetwork.PrivateEndpoint{
+				Properties: &armnetwork.PrivateEndpointProperties{
+					NetworkInterfaces: []*armnetwork.Interface{
+						{
+							Properties: &armnetwork.InterfacePropertiesFormat{
+								IPConfigurations: ipConfigurations,
+							},
+						},
+					},
+				},
+			},
+		}, nil)
+}

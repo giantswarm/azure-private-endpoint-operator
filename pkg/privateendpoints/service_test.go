@@ -21,7 +21,8 @@ import (
 )
 
 const (
-	testPrivateLinkName = "test-private-link"
+	testPrivateLinkName   = "test-private-link"
+	testPrivateEndpointIp = "10.10.10.10"
 )
 
 var _ = Describe("Service", func() {
@@ -216,7 +217,7 @@ var _ = Describe("Service", func() {
 
 		It("creates a new private endpoint for the private link, and sets the private endpoint IP annotation", func(ctx context.Context) {
 			expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
-			expectedPrivateEndpointIp := "10.10.10.10"
+			expectedPrivateEndpointIp := testPrivateEndpointIp
 			setupPrivateEndpointClientToReturnPrivateIp(
 				privateEndpointClient,
 				mcResourceGroup,
@@ -241,6 +242,78 @@ var _ = Describe("Service", func() {
 			privateEndpointIpAnnotation, ok := workloadAzureCluster.Annotations[privatelinks.AzurePrivateEndpointOperatorApiServerAnnotation]
 			Expect(ok).To(BeTrue())
 			Expect(privateEndpointIpAnnotation).To(Equal(expectedPrivateEndpointIp))
+		})
+	})
+
+	When("workload cluster has already been reconciled and private endpoint has already been created", func() {
+		BeforeEach(func(ctx context.Context) {
+			// MC AzureCluster resource with private endpoints, as the WC has already been reconciled
+			expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
+			privateEndpoints := capz.PrivateEndpoints{expectedPrivateEndpointSpec(location, subscriptionID, mcResourceGroup, expectedPrivateEndpointName)}
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+				WithLocation(location).
+				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
+				Build()
+
+			// WC AzureClusterResource
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
+					WithAllowedSubscription(subscriptionID).
+					Build()).
+				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				Build()
+
+			// Kubernetes client
+			capzSchema, err := capz.SchemeBuilder.Build()
+			Expect(err).NotTo(HaveOccurred())
+			client := fake.NewClientBuilder().
+				WithScheme(capzSchema).
+				WithObjects(managementAzureCluster, workloadAzureCluster).
+				Build()
+
+			// Azure private endpoints mock client
+			gomockController := gomock.NewController(GinkgoT())
+			privateEndpointClient = mock_azure.NewMockPrivateEndpointsClient(gomockController)
+			setupPrivateEndpointClientToReturnPrivateIp(
+				privateEndpointClient,
+				mcResourceGroup,
+				expectedPrivateEndpointName,
+				testPrivateEndpointIp)
+
+			// Private endpoints scope
+			privateEndpointsScope, err = privateendpoints.NewScope(ctx, managementAzureCluster, client, privateEndpointClient)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Private links scope
+			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Private endpoints service
+			service, err = privateendpoints.NewService(privateEndpointsScope, privateLinksScope)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("reconciles in an idempotent way, so new private endpoint is not added", func(ctx context.Context) {
+			expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
+			expectedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, expectedPrivateEndpointName)
+
+			// private endpoint already exists
+			exists := privateEndpointsScope.ContainsPrivateEndpointSpec(expectedPrivateEndpoint)
+			Expect(exists).To(BeTrue())
+
+			// there is one private endpoint in the MC AzureCluster
+			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(1))
+
+			// reconcile newly created workload cluster
+			err = service.Reconcile(ctx)
+			Expect(err).NotTo(HaveOccurred())
+
+			// same private endpoint still exists
+			exists = privateEndpointsScope.ContainsPrivateEndpointSpec(expectedPrivateEndpoint)
+			Expect(exists).To(BeTrue())
+
+			// and there is still just one private endpoint in the MC AzureCluster
+			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(1))
 		})
 	})
 })

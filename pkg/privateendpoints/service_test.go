@@ -371,7 +371,7 @@ var _ = Describe("Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("corresponding private endpoint has been removed", func(ctx context.Context) {
+		It("removes corresponding private endpoint from the management cluster", func(ctx context.Context) {
 			removedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, "", removedPrivateLinkName)
 			presentPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, "", testPrivateLinkName)
 
@@ -398,6 +398,71 @@ var _ = Describe("Service", func() {
 			// other private endpoint still exists
 			exists = privateEndpointsScope.ContainsPrivateEndpointSpec(presentPrivateEndpoint)
 			Expect(exists).To(BeTrue())
+		})
+	})
+
+	When("workload cluster has been deleted", func() {
+		BeforeEach(func(ctx context.Context) {
+			// MC AzureCluster resource with private endpoints, as the WC has already been reconciled
+			privateEndpoints := capz.PrivateEndpoints{expectedPrivateEndpointSpec(location, subscriptionID, mcResourceGroup, "", testPrivateLinkName)}
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+				WithLocation(location).
+				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
+				Build()
+
+			// WC AzureClusterResource
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
+					WithAllowedSubscription(subscriptionID).
+					Build()).
+				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				Build()
+
+			// Kubernetes client
+			capzSchema, err := capz.SchemeBuilder.Build()
+			Expect(err).NotTo(HaveOccurred())
+			client := fake.NewClientBuilder().
+				WithScheme(capzSchema).
+				WithObjects(managementAzureCluster, workloadAzureCluster).
+				Build()
+
+			// Azure private endpoints mock client
+			gomockController := gomock.NewController(GinkgoT())
+			privateEndpointClient = mock_azure.NewMockPrivateEndpointsClient(gomockController)
+
+			// Private endpoints scope
+			privateEndpointsScope, err = privateendpoints.NewScope(ctx, managementAzureCluster, client, privateEndpointClient)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Private links scope
+			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Private endpoints service
+			service, err = privateendpoints.NewService(privateEndpointsScope, privateLinksScope)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("removes private endpoint from the management cluster", func(ctx context.Context) {
+			removedPrivateEndpoint := expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, "", testPrivateLinkName)
+
+			// initially there is one private endpoint in the MC AzureCluster
+			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(1))
+
+			// and the removed private endpoint exists initially
+			exists := privateEndpointsScope.ContainsPrivateEndpointSpec(removedPrivateEndpoint)
+			Expect(exists).To(BeTrue())
+
+			// reconcile newly created workload cluster
+			err = service.Delete(ctx)
+			Expect(err).NotTo(HaveOccurred())
+
+			// and now there are no private endpoints in the MC AzureCluster
+			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(0))
+
+			// so the removed private endpoint does not exist anymore
+			exists = privateEndpointsScope.ContainsPrivateEndpointSpec(removedPrivateEndpoint)
+			Expect(exists).To(BeFalse())
 		})
 	})
 })

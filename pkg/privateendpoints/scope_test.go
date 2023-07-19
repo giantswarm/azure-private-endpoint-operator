@@ -16,7 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure/mock_azure"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privateendpoints"
@@ -29,7 +28,6 @@ const (
 )
 
 var _ = Describe("Scope", func() {
-	var err error
 	var subscriptionID string
 	var resourceGroup string
 	var gomockController *gomock.Controller
@@ -42,7 +40,6 @@ var _ = Describe("Scope", func() {
 		subscriptionID = "1234"
 		resourceGroup = "test-rg"
 		gomockController = gomock.NewController(GinkgoT())
-		err = nil
 		privateEndpointNames = []string{
 			"test-private-endpoint-0",
 			"test-private-endpoint-1",
@@ -54,7 +51,6 @@ var _ = Describe("Scope", func() {
 	Describe("creating scope", func() {
 		var azureCluster *capz.AzureCluster
 		var client client.Client
-		var privateEndpointClient azure.PrivateEndpointsClient
 
 		BeforeEach(func() {
 			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
@@ -69,33 +65,35 @@ var _ = Describe("Scope", func() {
 		})
 
 		It("creates scope", func(ctx context.Context) {
+			var err error
 			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, privateEndpointClient)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(scope).NotTo(BeNil())
 		})
 
 		It("fails to create scope when AzureCluster is nil", func(ctx context.Context) {
-			azureCluster = nil
-			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, privateEndpointClient)
+			var err error
+			scope, err = privateendpoints.NewScope(ctx, nil, client, privateEndpointClient)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalidConfig(err)).To(BeTrue())
 		})
 
 		It("fails to create scope when Kubernetes client is nil", func(ctx context.Context) {
-			client = nil
-			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, privateEndpointClient)
+			var err error
+			scope, err = privateendpoints.NewScope(ctx, azureCluster, nil, privateEndpointClient)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalidConfig(err)).To(BeTrue())
 		})
 
 		It("fails to create scope when Azure private endpoints client is nil", func(ctx context.Context) {
-			privateEndpointClient = nil
-			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, privateEndpointClient)
+			var err error
+			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, nil)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalidConfig(err)).To(BeTrue())
 		})
 
 		It("fails to create scope when AzureCluster does not have subnets", func(ctx context.Context) {
+			var err error
 			azureCluster.Spec.NetworkSpec.Subnets = capz.Subnets{}
 			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, privateEndpointClient)
 			Expect(err).To(HaveOccurred())

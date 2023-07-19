@@ -8,6 +8,7 @@ import (
 
 type AzureClusterBuilder struct {
 	subscriptionID string
+	location       string
 	resourceGroup  string
 	subnets        capz.Subnets
 	privateLinks   []capz.PrivateLink
@@ -19,6 +20,11 @@ func NewAzureClusterBuilder(subscriptionID, resourceGroup string) *AzureClusterB
 		subscriptionID: subscriptionID,
 		resourceGroup:  resourceGroup,
 	}
+}
+
+func (b *AzureClusterBuilder) WithLocation(location string) *AzureClusterBuilder {
+	b.location = location
+	return b
 }
 
 func (b *AzureClusterBuilder) WithSubnet(name string, role capz.SubnetRole, privateEndpoints capz.PrivateEndpoints) *AzureClusterBuilder {
@@ -47,13 +53,14 @@ func (b *AzureClusterBuilder) WithCondition(condition *capi.Condition) *AzureClu
 func (b *AzureClusterBuilder) Build() *capz.AzureCluster {
 	azureCluster := capz.AzureCluster{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      "test-cluster",
+			Name:      b.resourceGroup,
 			Namespace: "org-giantswarm",
 		},
 		Spec: capz.AzureClusterSpec{
 			ResourceGroup: b.resourceGroup,
 			AzureClusterClassSpec: capz.AzureClusterClassSpec{
 				SubscriptionID: b.subscriptionID,
+				Location:       b.location,
 			},
 			NetworkSpec: capz.NetworkSpec{
 				APIServerLB: capz.LoadBalancerSpec{

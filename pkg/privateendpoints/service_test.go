@@ -43,6 +43,55 @@ var _ = Describe("Service", func() {
 		wcResourceGroup = "test-wc-rg"
 	})
 
+	When("there is no private link where MC subscription is allowed", func() {
+		BeforeEach(func(ctx context.Context) {
+			otherSubscription := "abcd"
+
+			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+				WithLocation(location).
+				WithSubnet("test-subnet", capz.SubnetNode, nil).
+				Build()
+
+			// WC AzureClusterResource
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(otherSubscription, wcResourceGroup).
+				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
+					WithAllowedSubscription(otherSubscription).
+					Build()).
+				Build()
+
+			// Kubernetes client
+			capzSchema, err := capz.SchemeBuilder.Build()
+			Expect(err).NotTo(HaveOccurred())
+			client := fake.NewClientBuilder().
+				WithScheme(capzSchema).
+				WithObjects(managementAzureCluster, workloadAzureCluster).
+				Build()
+
+			// Azure private endpoints mock client
+			gomockController := gomock.NewController(GinkgoT())
+			privateEndpointClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
+
+			// Private endpoints scope
+			privateEndpointsScope, err = privateendpoints.NewScope(ctx, managementAzureCluster, client, privateEndpointClient)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Private links scope
+			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Private endpoints service
+			service, err = privateendpoints.NewService(privateEndpointsScope, privateLinksScope)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("returns SubscriptionCannotConnectToPrivateLink error", func(ctx context.Context) {
+			err = service.Reconcile(ctx)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsSubscriptionCannotConnectToPrivateLinkError(err)).To(BeTrue())
+		})
+	})
+
 	When("workload cluster with private link has just been created and private links are still not ready", func() {
 		BeforeEach(func(ctx context.Context) {
 			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
@@ -196,13 +245,4 @@ var _ = Describe("Service", func() {
 			Expect(exists).To(BeTrue())
 		})
 	})
-
-	//When("there is no private link where MC subscription is allowed", func() {
-	//	It("returns SubscriptionCannotConnectToPrivateLink error", func(ctx context.Context) {
-	//		err = service.Reconcile(ctx)
-	//		Expect(err).To(HaveOccurred())
-	//		Expect(errors.IsSubscriptionCannotConnectToPrivateLinkError(err)).To(BeTrue())
-	//	})
-	//})
-	//
 })

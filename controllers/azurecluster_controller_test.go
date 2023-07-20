@@ -6,6 +6,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -173,6 +174,32 @@ var _ = Describe("AzureClusterReconciler", func() {
 			_, err := reconciler.Reconcile(ctx, request)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsUnknownLoadBalancerType(err)).To(BeTrue())
+		})
+	})
+
+	When("MC AzureCluster resource is not found (e.g. misconfigured operator)", func() {
+		BeforeEach(func() {
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+				WithAPILoadBalancerType(capz.Internal).
+				Build()
+		})
+
+		JustBeforeEach(func() {
+			var err error
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterName)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("returns not found error", func(ctx context.Context) {
+			request := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "org-giantswarm",
+					Name:      workloadClusterName,
+				},
+			}
+			_, err := reconciler.Reconcile(ctx, request)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		})
 	})
 })

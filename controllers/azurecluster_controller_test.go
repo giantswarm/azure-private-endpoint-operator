@@ -23,7 +23,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 	var subscriptionID string
 	//var location string
 	//var mcResourceGroup string
-	var wcResourceGroup string
+	var workloadClusterName string
 	var managementAzureCluster *capz.AzureCluster
 	var workloadAzureCluster *capz.AzureCluster
 	var k8sClient client.Client
@@ -35,7 +35,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 		subscriptionID = "1234"
 		//location = "westeurope"
 		//mcResourceGroup = "test-mc-rg"
-		wcResourceGroup = "test-wc-rg"
+		workloadClusterName = "test-wc"
 
 		privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
 			gomockController := gomock.NewController(GinkgoT())
@@ -126,7 +126,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 	When("workload cluster has a public load balancer", func() {
 		BeforeEach(func() {
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
 				WithAPILoadBalancerType(capz.Public).
 				Build()
 		})
@@ -141,12 +141,38 @@ var _ = Describe("AzureClusterReconciler", func() {
 			request := ctrl.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: "org-giantswarm",
-					Name:      "ghost",
+					Name:      workloadClusterName,
 				},
 			}
 			result, err := reconciler.Reconcile(ctx, request)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
+		})
+	})
+
+	When("workload cluster has an unknown type load balancer", func() {
+		BeforeEach(func() {
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+				WithAPILoadBalancerType("SomethingNew").
+				Build()
+		})
+
+		JustBeforeEach(func() {
+			var err error
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterName)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("returns UnknownLoadBalancerTypeError", func(ctx context.Context) {
+			request := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "org-giantswarm",
+					Name:      workloadClusterName,
+				},
+			}
+			_, err := reconciler.Reconcile(ctx, request)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsUnknownLoadBalancerType(err)).To(BeTrue())
 		})
 	})
 })

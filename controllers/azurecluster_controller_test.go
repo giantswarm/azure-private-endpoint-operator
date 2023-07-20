@@ -3,6 +3,7 @@ package controllers_test
 import (
 	"context"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -258,11 +259,8 @@ var _ = Describe("AzureClusterReconciler", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(workloadAzureCluster.Finalizers).To(HaveLen(0))
 
-			request := ctrl.Request{
-				NamespacedName: workloadClusterNamespacedName,
-			}
 			var result ctrl.Result
-			result, err = reconciler.Reconcile(ctx, request)
+			result, err = reconciler.Reconcile(ctx, requestForWorkloadCluster(workloadClusterName))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
 
@@ -281,14 +279,8 @@ var _ = Describe("AzureClusterReconciler", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(0))
 
-			request := ctrl.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: "org-giantswarm",
-					Name:      workloadClusterName,
-				},
-			}
 			var result ctrl.Result
-			result, err = reconciler.Reconcile(ctx, request)
+			result, err = reconciler.Reconcile(ctx, requestForWorkloadCluster(workloadClusterName))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
 
@@ -308,4 +300,68 @@ var _ = Describe("AzureClusterReconciler", func() {
 			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0]).To(Equal(expectedPrivateEndpoint))
 		})
 	})
+
+	Describe("scenarios where reconciliation is requeued after a minute", func() {
+		var expectedResultRequeueAfterMinute ctrl.Result
+		BeforeEach(func() {
+			expectedResultRequeueAfterMinute = ctrl.Result{
+				RequeueAfter: time.Minute,
+			}
+		})
+
+		JustBeforeEach(func() {
+			var err error
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterName)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		When("workload cluster private links are not ready", func() {
+			BeforeEach(func() {
+				// MC AzureCluster resource (without private endpoints, as the WC has just been created)
+				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterName.Name).
+					WithLocation(location).
+					WithSubnet("test-subnet", capz.SubnetNode, nil).
+					Build()
+
+				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+					WithAPILoadBalancerType(capz.Internal).
+					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
+						WithAllowedSubscription(subscriptionID).
+						WithAutoApprovedSubscription(subscriptionID).
+						Build()).
+					// private links conditions is not set, meaning it's treated as Unknown
+					Build()
+			})
+
+			It("will requeue reconciliation after 1 minute", func(ctx context.Context) {
+				result, err := reconciler.Reconcile(ctx, requestForWorkloadCluster(workloadClusterName))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal(expectedResultRequeueAfterMinute))
+			})
+		})
+
+		//When("private endpoint has not been created yet", func() {
+		//	It("will requeue reconciliation after 1 minute")
+		//})
+		//
+		//When("private endpoint doesn't yet have a network interface", func() {
+		//	It("will requeue reconciliation after 1 minute")
+		//})
+		//
+		//When("private endpoint doesn't yet have a network interface with private IP", func() {
+		//	It("will requeue reconciliation after 1 minute")
+		//})
+	})
 })
+
+func requestForWorkloadCluster(workloadClusterName string) ctrl.Request {
+	workloadClusterNamespacedName := types.NamespacedName{
+		Namespace: "org-giantswarm",
+		Name:      workloadClusterName,
+	}
+	request := ctrl.Request{
+		NamespacedName: workloadClusterNamespacedName,
+	}
+
+	return request
+}

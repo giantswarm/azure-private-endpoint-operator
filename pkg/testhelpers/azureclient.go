@@ -1,6 +1,9 @@
 package testhelpers
 
 import (
+	"net/http"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v2"
 	"go.uber.org/mock/gomock"
@@ -55,4 +58,23 @@ func SetupPrivateEndpointClientToReturnPrivateIp(
 				},
 			},
 		}, nil)
+}
+
+func SetupPrivateEndpointClientToReturnNotFound(
+	privateEndpointClient *mock_azure.MockPrivateEndpointsClient,
+	mcResourceGroup string,
+	expectedPrivateEndpointName string) {
+
+	privateEndpointClient.
+		EXPECT().
+		Get(
+			gomock.Any(),
+			gomock.Eq(mcResourceGroup),
+			gomock.Eq(expectedPrivateEndpointName),
+			gomock.Eq(&armnetwork.PrivateEndpointsClientGetOptions{
+				Expand: to.Ptr[string]("NetworkInterfaces"),
+			})).
+		Return(armnetwork.PrivateEndpointsClientGetResponse{}, &azcore.ResponseError{
+			StatusCode: http.StatusNotFound,
+		})
 }

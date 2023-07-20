@@ -11,6 +11,7 @@ type AzureClusterBuilder struct {
 	location       string
 	resourceGroup  string
 	subnets        capz.Subnets
+	apiServerLB    capz.LoadBalancerSpec
 	privateLinks   []capz.PrivateLink
 	conditions     capi.Conditions
 }
@@ -38,8 +39,13 @@ func (b *AzureClusterBuilder) WithSubnet(name string, role capz.SubnetRole, priv
 	return b
 }
 
+func (b *AzureClusterBuilder) WithAPILoadBalancerType(lbType capz.LBType) *AzureClusterBuilder {
+	b.apiServerLB.Type = lbType
+	return b
+}
+
 func (b *AzureClusterBuilder) WithPrivateLink(privateLink capz.PrivateLink) *AzureClusterBuilder {
-	b.privateLinks = append(b.privateLinks, privateLink)
+	b.apiServerLB.PrivateLinks = append(b.apiServerLB.PrivateLinks, privateLink)
 	return b
 }
 
@@ -63,10 +69,8 @@ func (b *AzureClusterBuilder) Build() *capz.AzureCluster {
 				Location:       b.location,
 			},
 			NetworkSpec: capz.NetworkSpec{
-				APIServerLB: capz.LoadBalancerSpec{
-					PrivateLinks: b.privateLinks,
-				},
-				Subnets: b.subnets,
+				APIServerLB: b.apiServerLB,
+				Subnets:     b.subnets,
 			},
 		},
 		Status: capz.AzureClusterStatus{

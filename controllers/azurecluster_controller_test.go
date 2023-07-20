@@ -16,9 +16,14 @@ import (
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure/mock_azure"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 )
 
 var _ = Describe("AzureClusterReconciler", func() {
+	var subscriptionID string
+	//var location string
+	//var mcResourceGroup string
+	var wcResourceGroup string
 	var managementAzureCluster *capz.AzureCluster
 	var workloadAzureCluster *capz.AzureCluster
 	var k8sClient client.Client
@@ -27,6 +32,22 @@ var _ = Describe("AzureClusterReconciler", func() {
 	var reconciler *controllers.AzureClusterReconciler
 
 	BeforeEach(func() {
+		subscriptionID = "1234"
+		//location = "westeurope"
+		//mcResourceGroup = "test-mc-rg"
+		wcResourceGroup = "test-wc-rg"
+
+		privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
+			gomockController := gomock.NewController(GinkgoT())
+			return mock_azure.NewMockPrivateEndpointsClient(gomockController), nil
+		}
+		managementClusterName = types.NamespacedName{
+			Namespace: "org-giantswarm",
+			Name:      "giant",
+		}
+	})
+
+	JustBeforeEach(func() {
 		capzSchema, err := capz.SchemeBuilder.Build()
 		Expect(err).NotTo(HaveOccurred())
 
@@ -42,14 +63,6 @@ var _ = Describe("AzureClusterReconciler", func() {
 			k8sClientBuilder.WithObjects(objects...)
 		}
 		k8sClient = k8sClientBuilder.Build()
-		privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
-			gomockController := gomock.NewController(GinkgoT())
-			return mock_azure.NewMockPrivateEndpointsClient(gomockController), nil
-		}
-		managementClusterName = types.NamespacedName{
-			Namespace: "org-giantswarm",
-			Name:      "giant",
-		}
 	})
 
 	Describe("creating reconciler", func() {
@@ -92,7 +105,33 @@ var _ = Describe("AzureClusterReconciler", func() {
 	})
 
 	When("workload AzureCluster resources does not exist", func() {
+		JustBeforeEach(func() {
+			var err error
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterName)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("returns empty result without errors", func(ctx context.Context) {
+			request := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "org-giantswarm",
+					Name:      "ghost",
+				},
+			}
+			result, err := reconciler.Reconcile(ctx, request)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+		})
+	})
+
+	When("workload cluster has a public load balancer", func() {
 		BeforeEach(func() {
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+				WithAPILoadBalancerType(capz.Public).
+				Build()
+		})
+
+		JustBeforeEach(func() {
 			var err error
 			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterName)
 			Expect(err).NotTo(HaveOccurred())

@@ -380,13 +380,41 @@ var _ = Describe("AzureClusterReconciler", func() {
 			})
 		})
 
-		//When("private endpoint doesn't yet have a network interface", func() {
-		//	It("will requeue reconciliation after 1 minute")
-		//})
-		//
-		//When("private endpoint doesn't yet have a network interface with private IP", func() {
-		//	It("will requeue reconciliation after 1 minute")
-		//})
+		When("private endpoint doesn't yet have a network interface with private IP", func() {
+			BeforeEach(func() {
+				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
+					WithLocation(location).
+					WithSubnet("test-subnet", capz.SubnetNode, nil).
+					Build()
+
+				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+					WithAPILoadBalancerType(capz.Internal).
+					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
+						WithAllowedSubscription(subscriptionID).
+						WithAutoApprovedSubscription(subscriptionID).
+						Build()).
+					WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+					Build()
+
+				privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
+					gomockController := gomock.NewController(GinkgoT())
+					privateEndpointsClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
+					expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
+					testhelpers.SetupPrivateEndpointClientWithoutPrivateIp(
+						privateEndpointsClient,
+						managementClusterNamespacedName.Name,
+						expectedPrivateEndpointName)
+
+					return privateEndpointsClient, nil
+				}
+			})
+
+			It("will requeue reconciliation after 1 minute", func(ctx context.Context) {
+				result, err := reconciler.Reconcile(ctx, requestForWorkloadCluster(workloadClusterName))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal(expectedResultRequeueAfterMinute))
+			})
+		})
 	})
 })
 

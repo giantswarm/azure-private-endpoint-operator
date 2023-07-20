@@ -26,6 +26,10 @@ podSecurityContext:
 securityContext:
   seccompProfile:
     type: RuntimeDefault
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
 
 managementCluster:
   name: PLACEHOLDER

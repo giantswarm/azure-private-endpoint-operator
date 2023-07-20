@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Add required values for pss policies.
+
 ### Added
 
 - Add `privatelinks` package with `Scope` object that is providing functionality to access and update private links info in AzureCluster CR.

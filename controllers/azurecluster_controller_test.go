@@ -20,6 +20,7 @@ import (
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure/mock_azure"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privatelinks"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 )
 
@@ -32,30 +33,40 @@ var _ = Describe("AzureClusterReconciler", func() {
 	var subscriptionID string
 	var location string
 	var managementClusterName string
-	var workloadClusterName string
+	var managementClusterNamespacedName types.NamespacedName
 	var managementAzureCluster *capz.AzureCluster
+	var workloadClusterName string
+	var workloadClusterNamespacedName types.NamespacedName
+	var workloadClusterRequest ctrl.Request
 	var workloadAzureCluster *capz.AzureCluster
 	var k8sClient client.Client
 	var privateEndpointsClientCreator azure.PrivateEndpointsClientCreator
-	var managementClusterNamespacedName types.NamespacedName
 	var reconciler *controllers.AzureClusterReconciler
 
 	BeforeEach(func() {
 		subscriptionID = "1234"
 		//location = "westeurope"
-		managementClusterName = "giant"
-		workloadClusterName = "awesome-wc"
-		managementAzureCluster = nil
-		workloadAzureCluster = nil
-		k8sClient = nil
 
-		privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
-			gomockController := gomock.NewController(GinkgoT())
-			return mock_azure.NewMockPrivateEndpointsClient(gomockController), nil
-		}
+		managementClusterName = "giant"
 		managementClusterNamespacedName = types.NamespacedName{
 			Namespace: "org-giantswarm",
 			Name:      managementClusterName,
+		}
+		managementAzureCluster = nil
+		workloadClusterName = "awesome-wc"
+		workloadClusterNamespacedName = types.NamespacedName{
+			Namespace: "org-giantswarm",
+			Name:      workloadClusterName,
+		}
+		workloadClusterRequest = ctrl.Request{
+			NamespacedName: workloadClusterNamespacedName,
+		}
+		workloadAzureCluster = nil
+
+		k8sClient = nil
+		privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
+			gomockController := gomock.NewController(GinkgoT())
+			return mock_azure.NewMockPrivateEndpointsClient(gomockController), nil
 		}
 	})
 
@@ -217,6 +228,9 @@ var _ = Describe("AzureClusterReconciler", func() {
 	})
 
 	When("workload cluster with private link has just been created and private links are ready", func() {
+		var expectedPrivateEndpointIp string
+		var privateEndpointGetCallCounter int
+
 		BeforeEach(func() {
 			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
 			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
@@ -233,16 +247,19 @@ var _ = Describe("AzureClusterReconciler", func() {
 				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
 				Build()
 
+			privateEndpointGetCallCounter = 0
+
 			privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
 				gomockController := gomock.NewController(GinkgoT())
 				privateEndpointsClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
 				expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
-				expectedPrivateEndpointIp := testPrivateEndpointIp
-				testhelpers.SetupPrivateEndpointClientToReturnPrivateIp(
+				expectedPrivateEndpointIp = testPrivateEndpointIp
+				testhelpers.SetupPrivateEndpointClientToReturnNotFoundAndThenPrivateEndpointWithPrivateIp(
 					privateEndpointsClient,
 					managementClusterNamespacedName.Name,
 					expectedPrivateEndpointName,
-					expectedPrivateEndpointIp)
+					expectedPrivateEndpointIp,
+					&privateEndpointGetCallCounter)
 
 				return privateEndpointsClient, nil
 			}
@@ -255,18 +272,12 @@ var _ = Describe("AzureClusterReconciler", func() {
 		})
 
 		It("sets a finalizer on workload AzureCluster resource", func(ctx context.Context) {
-			workloadClusterNamespacedName := types.NamespacedName{
-				Namespace: "org-giantswarm",
-				Name:      workloadClusterName,
-			}
 			err := k8sClient.Get(ctx, workloadClusterNamespacedName, workloadAzureCluster)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(workloadAzureCluster.Finalizers).To(HaveLen(0))
 
-			var result ctrl.Result
-			result, err = reconciler.Reconcile(ctx, requestForWorkloadCluster(workloadClusterName))
+			_, err = reconciler.Reconcile(ctx, workloadClusterRequest)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
 
 			// get updated workload AzureCluster
 			err = k8sClient.Get(ctx, workloadClusterNamespacedName, workloadAzureCluster)
@@ -283,16 +294,19 @@ var _ = Describe("AzureClusterReconciler", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(0))
 
+			//
+			// first Reconcile call that does one part of the job
+			//
 			var result ctrl.Result
-			result, err = reconciler.Reconcile(ctx, requestForWorkloadCluster(workloadClusterName))
+			result, err = reconciler.Reconcile(ctx, workloadClusterRequest)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: time.Minute}))
 
 			// get updated management AzureCluster
 			err = k8sClient.Get(ctx, managementClusterNamespacedName, managementAzureCluster)
 			Expect(err).NotTo(HaveOccurred())
 
-			// expected private endpoint has been created
+			// done: expected private endpoint has been added to the management AzureCluster
 			expectedPrivateEndpoint := testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)).
 				WithLocation(location).
 				WithPrivateLinkServiceConnection(subscriptionID, workloadClusterName, testPrivateLinkName).
@@ -302,6 +316,29 @@ var _ = Describe("AzureClusterReconciler", func() {
 			// normalize resource before comparison (we don't care about this field here)
 			managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0].PrivateLinkServiceConnections[0].RequestMessage = ""
 			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0]).To(Equal(expectedPrivateEndpoint))
+
+			// still not done: workload AzureCluster still does not have private endpoint IP set,
+			// because the private endpoint is still not created on Azure
+			err = k8sClient.Get(ctx, workloadClusterNamespacedName, workloadAzureCluster)
+			Expect(err).NotTo(HaveOccurred())
+			_, ok := workloadAzureCluster.Annotations[privatelinks.AzurePrivateEndpointOperatorApiServerAnnotation]
+			Expect(ok).To(BeFalse())
+
+			//
+			// second Reconcile call that finishes the job (since the private endpoint has been
+			// fully created now)
+			//
+			result, err = reconciler.Reconcile(ctx, workloadClusterRequest)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// done: workload AzureCluster now has private endpoint IP set, because the private
+			// endpoint has been created
+			err = k8sClient.Get(ctx, workloadClusterNamespacedName, workloadAzureCluster)
+			Expect(err).NotTo(HaveOccurred())
+			privateEndpointIp, ok := workloadAzureCluster.Annotations[privatelinks.AzurePrivateEndpointOperatorApiServerAnnotation]
+			Expect(ok).To(BeTrue())
+			Expect(privateEndpointIp).To(Equal(expectedPrivateEndpointIp))
 		})
 	})
 
@@ -340,7 +377,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 			})
 
 			It("will requeue reconciliation after 1 minute", func(ctx context.Context) {
-				result, err := reconciler.Reconcile(ctx, requestForWorkloadCluster(workloadClusterName))
+				result, err := reconciler.Reconcile(ctx, workloadClusterRequest)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).To(Equal(expectedResultRequeueAfterMinute))
 			})
@@ -378,7 +415,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 			})
 
 			It("will requeue reconciliation after 1 minute", func(ctx context.Context) {
-				result, err := reconciler.Reconcile(ctx, requestForWorkloadCluster(workloadClusterName))
+				result, err := reconciler.Reconcile(ctx, workloadClusterRequest)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).To(Equal(expectedResultRequeueAfterMinute))
 			})
@@ -417,22 +454,10 @@ var _ = Describe("AzureClusterReconciler", func() {
 			})
 
 			It("will requeue reconciliation after 1 minute", func(ctx context.Context) {
-				result, err := reconciler.Reconcile(ctx, requestForWorkloadCluster(workloadClusterName))
+				result, err := reconciler.Reconcile(ctx, workloadClusterRequest)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).To(Equal(expectedResultRequeueAfterMinute))
 			})
 		})
 	})
 })
-
-func requestForWorkloadCluster(workloadClusterName string) ctrl.Request {
-	workloadClusterNamespacedName := types.NamespacedName{
-		Namespace: "org-giantswarm",
-		Name:      workloadClusterName,
-	}
-	request := ctrl.Request{
-		NamespacedName: workloadClusterNamespacedName,
-	}
-
-	return request
-}

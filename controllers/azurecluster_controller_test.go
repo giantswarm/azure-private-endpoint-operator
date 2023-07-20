@@ -249,6 +249,32 @@ var _ = Describe("AzureClusterReconciler", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		It("sets a finalizer on workload AzureCluster resource", func(ctx context.Context) {
+			workloadClusterNamespacedName := types.NamespacedName{
+				Namespace: "org-giantswarm",
+				Name:      workloadClusterName,
+			}
+			err := k8sClient.Get(ctx, workloadClusterNamespacedName, workloadAzureCluster)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(workloadAzureCluster.Finalizers).To(HaveLen(0))
+
+			request := ctrl.Request{
+				NamespacedName: workloadClusterNamespacedName,
+			}
+			var result ctrl.Result
+			result, err = reconciler.Reconcile(ctx, request)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// get updated workload AzureCluster
+			err = k8sClient.Get(ctx, workloadClusterNamespacedName, workloadAzureCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			// finalizer has been set
+			Expect(workloadAzureCluster.Finalizers).To(HaveLen(1))
+			Expect(workloadAzureCluster.Finalizers[0]).To(Equal(controllers.AzureClusterControllerFinalizer))
+		})
+
 		It("creates a new private endpoint for the private link", func(ctx context.Context) {
 			// private endpoint does not exist yet
 			err := k8sClient.Get(ctx, managementClusterName, managementAzureCluster)

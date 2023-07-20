@@ -45,7 +45,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 	BeforeEach(func() {
 		subscriptionID = "1234"
-		//location = "westeurope"
+		location = "westeurope"
 
 		managementClusterName = "giant"
 		managementClusterNamespacedName = types.NamespacedName{
@@ -339,6 +339,58 @@ var _ = Describe("AzureClusterReconciler", func() {
 			privateEndpointIp, ok := workloadAzureCluster.Annotations[privatelinks.AzurePrivateEndpointOperatorApiServerAnnotation]
 			Expect(ok).To(BeTrue())
 			Expect(privateEndpointIp).To(Equal(expectedPrivateEndpointIp))
+		})
+	})
+
+	When("workload cluster has been deleted", func() {
+		BeforeEach(func() {
+			// MC AzureCluster resource
+			privateEndpoints := capz.PrivateEndpoints{
+				testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)).
+					WithLocation(location).
+					WithPrivateLinkServiceConnection(subscriptionID, workloadClusterName, testPrivateLinkName).
+					Build(),
+			}
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
+				WithLocation(location).
+				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
+				Build()
+
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+				WithAPILoadBalancerType(capz.Internal).
+				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
+					WithAllowedSubscription(subscriptionID).
+					WithAutoApprovedSubscription(subscriptionID).
+					Build()).
+				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithFinalizer(controllers.AzureClusterControllerFinalizer).
+				WithDeletionTimestamp(time.Now()).
+				Build()
+		})
+
+		JustBeforeEach(func() {
+			var err error
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("deletes private endpoint from management AzureCluster", func(ctx context.Context) {
+			// reconcile deleted workload cluster
+			result, err := reconciler.Reconcile(ctx, workloadClusterRequest)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// workload AzureCluster is deleted
+			err = k8sClient.Get(ctx, workloadClusterNamespacedName, workloadAzureCluster)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+
+			// workload AzureCluster is deleted
+			err = k8sClient.Get(ctx, managementClusterNamespacedName, managementAzureCluster)
+			Expect(err).ToNot(HaveOccurred())
+
+			// private endpoint in management cluster is deleted
+			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(0))
 		})
 	})
 

@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v2"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
@@ -188,7 +186,7 @@ var _ = Describe("Service", func() {
 
 		It("creates a new private endpoint for the private link, but still doesn't know the private endpoint IP", func(ctx context.Context) {
 			expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
-			setupPrivateEndpointClientWithoutPrivateIp(
+			testhelpers.SetupPrivateEndpointClientWithoutPrivateIp(
 				privateEndpointClient,
 				mcResourceGroup,
 				expectedPrivateEndpointName)
@@ -218,7 +216,7 @@ var _ = Describe("Service", func() {
 		It("creates a new private endpoint for the private link, and sets the private endpoint IP annotation", func(ctx context.Context) {
 			expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
 			expectedPrivateEndpointIp := testPrivateEndpointIp
-			setupPrivateEndpointClientToReturnPrivateIp(
+			testhelpers.SetupPrivateEndpointClientToReturnPrivateIp(
 				privateEndpointClient,
 				mcResourceGroup,
 				expectedPrivateEndpointName,
@@ -274,7 +272,7 @@ var _ = Describe("Service", func() {
 			// Azure private endpoints mock client
 			gomockController := gomock.NewController(GinkgoT())
 			privateEndpointClient = mock_azure.NewMockPrivateEndpointsClient(gomockController)
-			setupPrivateEndpointClientToReturnPrivateIp(
+			testhelpers.SetupPrivateEndpointClientToReturnPrivateIp(
 				privateEndpointClient,
 				mcResourceGroup,
 				expectedPrivateEndpointName,
@@ -351,7 +349,7 @@ var _ = Describe("Service", func() {
 			// Azure private endpoints mock client
 			gomockController := gomock.NewController(GinkgoT())
 			privateEndpointClient = mock_azure.NewMockPrivateEndpointsClient(gomockController)
-			setupPrivateEndpointClientToReturnPrivateIp(
+			testhelpers.SetupPrivateEndpointClientToReturnPrivateIp(
 				privateEndpointClient,
 				mcResourceGroup,
 				expectedPrivateEndpointName,
@@ -473,53 +471,4 @@ func expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, priv
 		Build()
 
 	return privateEndpointSpec
-}
-
-func setupPrivateEndpointClientWithoutPrivateIp(
-	privateEndpointClient *mock_azure.MockPrivateEndpointsClient,
-	mcResourceGroup string,
-	expectedPrivateEndpointName string) {
-	setupPrivateEndpointClientToReturnPrivateIp(privateEndpointClient, mcResourceGroup, expectedPrivateEndpointName, "")
-}
-
-func setupPrivateEndpointClientToReturnPrivateIp(
-	privateEndpointClient *mock_azure.MockPrivateEndpointsClient,
-	mcResourceGroup string,
-	expectedPrivateEndpointName string,
-	expectedPrivateIpString string) {
-
-	var ipConfigurations []*armnetwork.InterfaceIPConfiguration
-
-	if expectedPrivateIpString != "" {
-		ipConfigurations = []*armnetwork.InterfaceIPConfiguration{
-			{
-				Properties: &armnetwork.InterfaceIPConfigurationPropertiesFormat{
-					PrivateIPAddress: to.Ptr(expectedPrivateIpString),
-				},
-			},
-		}
-	}
-
-	privateEndpointClient.
-		EXPECT().
-		Get(
-			gomock.Any(),
-			gomock.Eq(mcResourceGroup),
-			gomock.Eq(expectedPrivateEndpointName),
-			gomock.Eq(&armnetwork.PrivateEndpointsClientGetOptions{
-				Expand: to.Ptr[string]("NetworkInterfaces"),
-			})).
-		Return(armnetwork.PrivateEndpointsClientGetResponse{
-			PrivateEndpoint: armnetwork.PrivateEndpoint{
-				Properties: &armnetwork.PrivateEndpointProperties{
-					NetworkInterfaces: []*armnetwork.Interface{
-						{
-							Properties: &armnetwork.InterfacePropertiesFormat{
-								IPConfigurations: ipConfigurations,
-							},
-						},
-					},
-				},
-			},
-		}, nil)
 }

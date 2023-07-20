@@ -62,8 +62,9 @@ func NewAzureClusterReconciler(client client.Client, privateEndpointsClientCreat
 	}
 
 	return &AzureClusterReconciler{
-		Client:                client,
-		managementClusterName: managementClusterName,
+		Client:                        client,
+		privateEndpointsClientCreator: privateEndpointsClientCreator,
+		managementClusterName:         managementClusterName,
 	}, nil
 }
 

@@ -319,6 +319,8 @@ var _ = Describe("AzureClusterReconciler", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		// workload AzureCluster has private link, but the private link is still not ready, which
+		// happens when the workload cluster has just been created
 		When("workload cluster private links are not ready", func() {
 			BeforeEach(func() {
 				// MC AzureCluster resource (without private endpoints, as the WC has just been created)
@@ -344,6 +346,8 @@ var _ = Describe("AzureClusterReconciler", func() {
 			})
 		})
 
+		// workload cluster has been created, private links are ready, private endpoint has been
+		// added to the management cluster, but CAPZ still hasn't created the private endpoint
 		When("private endpoint has not been created yet", func() {
 			BeforeEach(func() {
 				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
@@ -380,6 +384,9 @@ var _ = Describe("AzureClusterReconciler", func() {
 			})
 		})
 
+		// workload cluster has been created, private links are ready, private endpoint has been
+		// added to the management cluster, but private endpoint creation is still in progress on
+		// Azure
 		When("private endpoint doesn't yet have a network interface with private IP", func() {
 			BeforeEach(func() {
 				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).

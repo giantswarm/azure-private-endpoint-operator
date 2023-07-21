@@ -16,7 +16,6 @@ type AzureClusterBuilder struct {
 	resourceGroup     string
 	subnets           capz.Subnets
 	apiServerLB       capz.LoadBalancerSpec
-	privateLinks      []capz.PrivateLink
 	conditions        capi.Conditions
 }
 

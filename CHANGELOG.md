@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add this changelog
 - Add Helm chart
 - Add `privateendpoints` package with `scope` object that is providing functionality to access and update private endpoints in AzureCluster CR.
+- Add private endpoints reconciler Service
+- Add AzureCluster controller
 
 ### Changed
 

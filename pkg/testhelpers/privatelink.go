@@ -5,8 +5,9 @@ import (
 )
 
 type PrivateLinkBuilder struct {
-	name                 string
-	allowedSubscriptions []string
+	name                      string
+	allowedSubscriptions      []string
+	autoApprovedSubscriptions []string
 }
 
 func NewPrivateLinkBuilder(name string) *PrivateLinkBuilder {
@@ -20,10 +21,16 @@ func (b *PrivateLinkBuilder) WithAllowedSubscription(subscriptionID string) *Pri
 	return b
 }
 
+func (b *PrivateLinkBuilder) WithAutoApprovedSubscription(subscriptionID string) *PrivateLinkBuilder {
+	b.autoApprovedSubscriptions = append(b.autoApprovedSubscriptions, subscriptionID)
+	return b
+}
+
 func (b *PrivateLinkBuilder) Build() capz.PrivateLink {
 	privateLink := capz.PrivateLink{
-		Name:                 b.name,
-		AllowedSubscriptions: b.allowedSubscriptions,
+		Name:                      b.name,
+		AllowedSubscriptions:      b.allowedSubscriptions,
+		AutoApprovedSubscriptions: b.autoApprovedSubscriptions,
 	}
 
 	return privateLink

@@ -40,11 +40,12 @@ func (b *PrivateEndpointBuilder) Build() capz.PrivateEndpointSpec {
 		Name:                          b.name,
 		Location:                      b.location,
 		PrivateLinkServiceConnections: b.privateLinkServiceConnections,
+		ManualApproval:                false,
 	}
 
 	return privateEndpoint
 }
 
 func FakePrivateLinkConnectionName(subscriptionID, resourceGroup, privateLinkName string) string {
-	return fmt.Sprintf("connection-to-%s-%s-%s", subscriptionID, resourceGroup, privateLinkName)
+	return fmt.Sprintf("%s-connection", privateLinkName)
 }

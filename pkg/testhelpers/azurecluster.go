@@ -1,18 +1,22 @@
 package testhelpers
 
 import (
+	"time"
+
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 type AzureClusterBuilder struct {
-	subscriptionID string
-	location       string
-	resourceGroup  string
-	subnets        capz.Subnets
-	privateLinks   []capz.PrivateLink
-	conditions     capi.Conditions
+	deletionTimestamp *meta.Time
+	finalizers        []string
+	subscriptionID    string
+	location          string
+	resourceGroup     string
+	subnets           capz.Subnets
+	apiServerLB       capz.LoadBalancerSpec
+	conditions        capi.Conditions
 }
 
 func NewAzureClusterBuilder(subscriptionID, resourceGroup string) *AzureClusterBuilder {
@@ -27,6 +31,17 @@ func (b *AzureClusterBuilder) WithLocation(location string) *AzureClusterBuilder
 	return b
 }
 
+func (b *AzureClusterBuilder) WithFinalizer(finalizer string) *AzureClusterBuilder {
+	b.finalizers = append(b.finalizers, finalizer)
+	return b
+}
+
+func (b *AzureClusterBuilder) WithDeletionTimestamp(time time.Time) *AzureClusterBuilder {
+	deletedTimestamp := meta.NewTime(time)
+	b.deletionTimestamp = &deletedTimestamp
+	return b
+}
+
 func (b *AzureClusterBuilder) WithSubnet(name string, role capz.SubnetRole, privateEndpoints capz.PrivateEndpoints) *AzureClusterBuilder {
 	b.subnets = append(b.subnets, capz.SubnetSpec{
 		SubnetClassSpec: capz.SubnetClassSpec{
@@ -38,8 +53,13 @@ func (b *AzureClusterBuilder) WithSubnet(name string, role capz.SubnetRole, priv
 	return b
 }
 
+func (b *AzureClusterBuilder) WithAPILoadBalancerType(lbType capz.LBType) *AzureClusterBuilder {
+	b.apiServerLB.Type = lbType
+	return b
+}
+
 func (b *AzureClusterBuilder) WithPrivateLink(privateLink capz.PrivateLink) *AzureClusterBuilder {
-	b.privateLinks = append(b.privateLinks, privateLink)
+	b.apiServerLB.PrivateLinks = append(b.apiServerLB.PrivateLinks, privateLink)
 	return b
 }
 
@@ -53,8 +73,10 @@ func (b *AzureClusterBuilder) WithCondition(condition *capi.Condition) *AzureClu
 func (b *AzureClusterBuilder) Build() *capz.AzureCluster {
 	azureCluster := capz.AzureCluster{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      b.resourceGroup,
-			Namespace: "org-giantswarm",
+			Name:              b.resourceGroup,
+			Namespace:         "org-giantswarm",
+			Finalizers:        b.finalizers,
+			DeletionTimestamp: b.deletionTimestamp,
 		},
 		Spec: capz.AzureClusterSpec{
 			ResourceGroup: b.resourceGroup,
@@ -63,10 +85,8 @@ func (b *AzureClusterBuilder) Build() *capz.AzureCluster {
 				Location:       b.location,
 			},
 			NetworkSpec: capz.NetworkSpec{
-				APIServerLB: capz.LoadBalancerSpec{
-					PrivateLinks: b.privateLinks,
-				},
-				Subnets: b.subnets,
+				APIServerLB: b.apiServerLB,
+				Subnets:     b.subnets,
 			},
 		},
 		Status: capz.AzureClusterStatus{

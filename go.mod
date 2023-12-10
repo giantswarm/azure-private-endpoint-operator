@@ -10,7 +10,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.13.2
 	github.com/onsi/gomega v1.30.0
 	go.uber.org/mock v0.2.0
-	go.uber.org/zap v1.24.0
+	go.uber.org/zap v1.26.0
 	k8s.io/api v0.25.11
 	k8s.io/apimachinery v0.25.11
 	k8s.io/client-go v0.25.11
@@ -79,8 +79,7 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	go.uber.org/atomic v1.7.0 // indirect
-	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.4.0 // indirect

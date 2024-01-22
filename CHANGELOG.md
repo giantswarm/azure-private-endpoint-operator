@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2024-01-22
+
 ### Changed
 
 - Configure `gsoci.azurecr.io` as the default container image registry.
@@ -33,5 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated Dockerfile
 
-[Unreleased]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/giantswarm/azure-private-endpoint-operator/releases/tag/v0.1.0

@@ -7,8 +7,8 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.5.1
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5 v5.1.0
 	github.com/giantswarm/microerror v0.4.1
-	github.com/onsi/ginkgo/v2 v2.16.0
-	github.com/onsi/gomega v1.31.1
+	github.com/onsi/ginkgo/v2 v2.17.0
+	github.com/onsi/gomega v1.32.0
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.27.0
 	k8s.io/api v0.25.11

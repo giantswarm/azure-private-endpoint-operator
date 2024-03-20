@@ -8,10 +8,11 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5"
-	"github.com/giantswarm/microerror"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/giantswarm/microerror"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azurecluster"
@@ -34,9 +35,9 @@ type Scope interface {
 	Close(ctx context.Context) error
 }
 
-func NewScope(ctx context.Context, managementCluster *capz.AzureCluster, client client.Client, privateEndpointClient azure.PrivateEndpointsClient) (Scope, error) {
-	if managementCluster == nil {
-		return nil, microerror.Maskf(errors.InvalidConfigError, "managementCluster must be set")
+func NewScope(ctx context.Context, cluster *capz.AzureCluster, client client.Client, privateEndpointClient azure.PrivateEndpointsClient) (Scope, error) {
+	if cluster == nil {
+		return nil, microerror.Maskf(errors.InvalidConfigError, "cluster must be set")
 	}
 	if client == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "client must be set")
@@ -46,8 +47,8 @@ func NewScope(ctx context.Context, managementCluster *capz.AzureCluster, client 
 	}
 
 	var nodeSubnet *capz.SubnetSpec
-	for i := range managementCluster.Spec.NetworkSpec.Subnets {
-		subnet := &managementCluster.Spec.NetworkSpec.Subnets[i]
+	for i := range cluster.Spec.NetworkSpec.Subnets {
+		subnet := &cluster.Spec.NetworkSpec.Subnets[i]
 
 		// We add private endpoints to "node" subnet, or to be precise, we allocate private endpoint IPs from the "node"
 		// subnet, the endpoints are not really "added" to the subnet.
@@ -61,14 +62,14 @@ func NewScope(ctx context.Context, managementCluster *capz.AzureCluster, client 
 	if nodeSubnet != nil {
 		privateEndpointsSubnet = nodeSubnet
 	} else {
-		if len(managementCluster.Spec.NetworkSpec.Subnets) == 0 {
-			return nil, microerror.Maskf(errors.SubnetsNotSetError, "Management cluster does not have any subnets set")
+		if len(cluster.Spec.NetworkSpec.Subnets) == 0 {
+			return nil, microerror.Maskf(errors.SubnetsNotSetError, "the cluster does not have any subnets set")
 		}
 
-		privateEndpointsSubnet = &managementCluster.Spec.NetworkSpec.Subnets[0]
+		privateEndpointsSubnet = &cluster.Spec.NetworkSpec.Subnets[0]
 	}
 
-	baseScope, err := azurecluster.NewBaseScope(managementCluster, client)
+	baseScope, err := azurecluster.NewBaseScope(cluster, client)
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}

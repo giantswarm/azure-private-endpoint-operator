@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/giantswarm/microerror"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
@@ -29,6 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/giantswarm/microerror"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
@@ -90,27 +91,23 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	// If the workload cluster is public then we return, as there is no need to create a private endpoint to access
-	// a public load balancer
-	if workloadAzureCluster.Spec.NetworkSpec.APIServerLB.Type == capz.Public {
-		logger.Info(fmt.Sprintf("Skipping reconciliation of public workload cluster %s", workloadAzureCluster.Name))
+	// We don't need to do anything special for connections in MC itself
+	if workloadAzureCluster.Name == r.managementClusterName.Name &&
+		workloadAzureCluster.Namespace == r.managementClusterName.Namespace {
+		logger.Info(fmt.Sprintf("Skipping reconciliation of management cluster %s", workloadAzureCluster.Name))
 		return ctrl.Result{}, nil
 	}
 
-	// We now expect that we are working with an internal load balancer (which is used for private clusters), so any
-	// other load balancer type (e.g. potentially added in the future) is considered an error here.
-	if workloadAzureCluster.Spec.NetworkSpec.APIServerLB.Type != capz.Internal {
-		return ctrl.Result{},
-			microerror.Maskf(
-				errors.UnknownLoadBalancerTypeError,
-				"expected that load balancer type is %s, got %s",
-				capz.Internal,
-				workloadAzureCluster.Spec.NetworkSpec.APIServerLB.Type)
+	var managementAzureCluster capz.AzureCluster
+	if err = r.Client.Get(ctx, r.managementClusterName, &managementAzureCluster); err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	var managementAzureCluster capz.AzureCluster
-	err = r.Client.Get(ctx, r.managementClusterName, &managementAzureCluster)
-	if err != nil {
+	if err = validateLBType(workloadAzureCluster); err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
+	}
+
+	if err = validateLBType(managementAzureCluster); err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
@@ -134,26 +131,51 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
-	privateEndpointsScope, err := privateendpoints.NewScope(ctx, &managementAzureCluster, r.Client, privateEndpointsClient)
+
+	// will be used for MC to WC connections
+	mcPrivateEndpointsScope, err := privateendpoints.NewScope(ctx, &managementAzureCluster, r.Client, privateEndpointsClient)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 	// Always close the scope when exiting this function, so we can persist any MC AzureCluster changes.
 	defer func() {
-		if closeErr := privateEndpointsScope.Close(ctx); closeErr != nil && err == nil {
+		if closeErr := mcPrivateEndpointsScope.Close(ctx); closeErr != nil && err == nil {
 			err = closeErr
 		}
 	}()
 
-	// Finally, reconcile private links to private endpoints
-	privateEndpointsService, err := privateendpoints.NewService(privateEndpointsScope, privateLinksScope)
+	// will be used for WC to MC connections
+	// we don't need to close this scope here. WC will be patched by privateLinksScope.Close above.
+	wcPrivateEndpointsScope, err := privateendpoints.NewScope(ctx, &workloadAzureCluster, r.Client, privateEndpointsClient)
+	if err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
+	}
+
+	mcPrivateEndpointsService, err := privateendpoints.NewService(mcPrivateEndpointsScope, privateLinksScope)
+	if err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
+	}
+
+	wcPrivateEndpointsService, err := privateendpoints.NewService(wcPrivateEndpointsScope, privateLinksScope)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
 	if workloadAzureCluster.DeletionTimestamp.IsZero() {
 		r.setFinalizer(&workloadAzureCluster)
-		err = privateEndpointsService.Reconcile(ctx)
+
+		if workloadAzureCluster.Spec.NetworkSpec.APIServerLB.Type == capz.Internal {
+			err = mcPrivateEndpointsService.ReconcileMcToWcApi(ctx)
+		}
+
+		// When LB of k8s api of MC is internal load balancer, we assume
+		// - The cluster is private and the ingress LB is also internal LB.
+		// - There is already a private link for the ingress LB with the name of MC.
+		// We add a private endpoint to WC so that monitoring tools in WC can access ingress of MC.
+		if err == nil && managementAzureCluster.Spec.NetworkSpec.APIServerLB.Type == capz.Internal {
+			err = wcPrivateEndpointsService.ReconcileWcToMcIngress(ctx, generateWcToMcPrivateEndpointSpec(workloadAzureCluster, managementAzureCluster))
+		}
+
 		if errors.IsRetriable(err) {
 			logger.Info("A retriable error occurred, trying again in a minute", "error", err)
 			return ctrl.Result{
@@ -163,7 +185,12 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 	} else {
-		err = privateEndpointsService.Delete(ctx)
+		if workloadAzureCluster.Spec.NetworkSpec.APIServerLB.Type == capz.Internal {
+			err = mcPrivateEndpointsService.DeleteMcToWcApi(ctx)
+		}
+		// We don't need to do anything for WC to MC connections.
+		// CAPI controllers will clean private endpoints in WC side automatically.
+
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
@@ -171,6 +198,43 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// generateWcToMcPrivateEndpointSpec generates a PrivateEndpointSpec for the private endpoint that
+// connects the WC to the ingress of management cluster.
+// It assumes we already have a private link with name "<mc-name>-ingress-privatelink".
+func generateWcToMcPrivateEndpointSpec(wc capz.AzureCluster, mc capz.AzureCluster) capz.PrivateEndpointSpec {
+	return capz.PrivateEndpointSpec{
+		Name:     fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", wc.Name, mc.Name),
+		Location: wc.Spec.Location,
+		PrivateLinkServiceConnections: []capz.PrivateLinkServiceConnection{
+			{
+				Name: fmt.Sprintf("%s-to-%s-connection", wc.Name, mc.Name),
+				PrivateLinkServiceID: fmt.Sprintf(
+					"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
+					mc.Spec.SubscriptionID,
+					mc.Name,
+					fmt.Sprintf("%s-ingress-privatelink", mc.Name)),
+			},
+		},
+		ManualApproval: false,
+	}
+}
+
+// validateLBType checks if the load balancer type is either Internal or Public. Any
+// other load balancer type (e.g. potentially added in the future) is considered an error here.
+func validateLBType(azureCluster capz.AzureCluster) error {
+	if azureCluster.Spec.NetworkSpec.APIServerLB.Type != capz.Internal &&
+		azureCluster.Spec.NetworkSpec.APIServerLB.Type != capz.Public {
+		return microerror.Maskf(
+			errors.UnknownLoadBalancerTypeError,
+			"expected that load balancer type is %s or %s, got %s in cluster %s",
+			capz.Internal,
+			capz.Public,
+			azureCluster.Spec.NetworkSpec.APIServerLB.Type,
+			azureCluster.Name)
+	}
+	return nil
 }
 
 func (r *AzureClusterReconciler) setFinalizer(workloadCluster *capz.AzureCluster) {

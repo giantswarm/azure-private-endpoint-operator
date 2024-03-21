@@ -25,8 +25,10 @@ import (
 )
 
 const (
-	testPrivateLinkName   = "super-private-link"
-	testPrivateEndpointIp = "10.10.10.10"
+	testPrivateLinkNameForWcAPI       = "super-private-link"
+	testPrivateEndpointIpForWcAPI     = "10.10.10.10"
+	testPrivateLinkNameForMcIngress   = "giant-ingress-privatelink"
+	testPrivateEndpointIpForMcIngress = "10.10.10.11"
 )
 
 var _ = Describe("AzureClusterReconciler", func() {
@@ -148,10 +150,10 @@ var _ = Describe("AzureClusterReconciler", func() {
 			})
 		})
 
-		When("workload cluster has a public load balancer", func() {
+		When("the cluster is the MC", func() {
 			BeforeEach(func() {
-				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
-					WithAPILoadBalancerType(capz.Public).
+				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterName).
+					WithAPILoadBalancerType(capz.Internal).
 					Build()
 			})
 
@@ -165,7 +167,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 				request := ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Namespace: "org-giantswarm",
-						Name:      workloadClusterName,
+						Name:      managementClusterName,
 					},
 				}
 				result, err := reconciler.Reconcile(ctx, request)
@@ -178,6 +180,10 @@ var _ = Describe("AzureClusterReconciler", func() {
 			BeforeEach(func() {
 				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
 					WithAPILoadBalancerType("SomethingNew").
+					Build()
+
+				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterName).
+					WithAPILoadBalancerType(capz.Public).
 					Build()
 			})
 
@@ -235,16 +241,18 @@ var _ = Describe("AzureClusterReconciler", func() {
 			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
 			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
 				WithLocation(location).
+				WithAPILoadBalancerType(capz.Public).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
 			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
 				WithAPILoadBalancerType(capz.Internal).
-				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
+				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
 					WithAllowedSubscription(subscriptionID).
 					WithAutoApprovedSubscription(subscriptionID).
 					Build()).
 				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
 			privateEndpointGetCallCounter = 0
@@ -252,8 +260,8 @@ var _ = Describe("AzureClusterReconciler", func() {
 			privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
 				gomockController := gomock.NewController(GinkgoT())
 				privateEndpointsClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
-				expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
-				expectedPrivateEndpointIp = testPrivateEndpointIp
+				expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkNameForWcAPI)
+				expectedPrivateEndpointIp = testPrivateEndpointIpForWcAPI
 				testhelpers.SetupPrivateEndpointClientToReturnNotFoundAndThenPrivateEndpointWithPrivateIp(
 					privateEndpointsClient,
 					managementClusterNamespacedName.Name,
@@ -295,7 +303,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(0))
 
 			//
-			// first Reconcile call that does one part of the job
+			// first ReconcileMcToWcApi call that does one part of the job
 			//
 			var result ctrl.Result
 			result, err = reconciler.Reconcile(ctx, workloadClusterRequest)
@@ -307,9 +315,9 @@ var _ = Describe("AzureClusterReconciler", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// done: expected private endpoint has been added to the management AzureCluster
-			expectedPrivateEndpoint := testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)).
+			expectedPrivateEndpoint := testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-privateendpoint", testPrivateLinkNameForWcAPI)).
 				WithLocation(location).
-				WithPrivateLinkServiceConnection(subscriptionID, workloadClusterName, testPrivateLinkName).
+				WithPrivateLinkServiceConnection(subscriptionID, workloadClusterName, testPrivateLinkNameForWcAPI).
 				Build()
 			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(1))
 
@@ -325,7 +333,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 			Expect(ok).To(BeFalse())
 
 			//
-			// second Reconcile call that finishes the job (since the private endpoint has been
+			// second ReconcileMcToWcApi call that finishes the job (since the private endpoint has been
 			// fully created now)
 			//
 			result, err = reconciler.Reconcile(ctx, workloadClusterRequest)
@@ -342,23 +350,125 @@ var _ = Describe("AzureClusterReconciler", func() {
 		})
 	})
 
+	When("management cluster and workload cluster are private clusters", func() {
+
+		BeforeEach(func() {
+			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
+				WithLocation(location).
+				WithAPILoadBalancerType(capz.Internal).
+				WithSubnet("test-subnet", capz.SubnetNode, nil).
+				Build()
+
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+				WithAPILoadBalancerType(capz.Internal).
+				WithLocation(location).
+				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
+					WithAllowedSubscription(subscriptionID).
+					WithAutoApprovedSubscription(subscriptionID).
+					Build()).
+				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithSubnet("test-subnet", capz.SubnetNode, nil).
+				Build()
+
+			privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
+				gomockController := gomock.NewController(GinkgoT())
+				privateEndpointsClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
+				testhelpers.SetupPrivateEndpointClientToReturnPrivateIp(
+					privateEndpointsClient,
+					managementClusterName,
+					fmt.Sprintf("%s-privateendpoint", testPrivateLinkNameForWcAPI),
+					testPrivateEndpointIpForWcAPI)
+
+				testhelpers.SetupPrivateEndpointClientToReturnPrivateIp(
+					privateEndpointsClient,
+					workloadClusterName,
+					fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName),
+					testPrivateEndpointIpForMcIngress)
+
+				return privateEndpointsClient, nil
+			}
+		})
+
+		JustBeforeEach(func() {
+			var err error
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("injects private endpoints to both WC and MC", func(ctx context.Context) {
+			var result ctrl.Result
+			var err error
+
+			result, err = reconciler.Reconcile(ctx, workloadClusterRequest)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// MC checks
+
+			// get updated management AzureCluster
+			err = k8sClient.Get(ctx, managementClusterNamespacedName, managementAzureCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			// done: expected private endpoint has been added to the management AzureCluster
+			expectedPrivateEndpoint := testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-privateendpoint", testPrivateLinkNameForWcAPI)).
+				WithLocation(location).
+				WithPrivateLinkServiceConnection(subscriptionID, workloadClusterName, testPrivateLinkNameForWcAPI).
+				Build()
+			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(1))
+
+			// normalize resource before comparison (we don't care about this field here)
+			managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0].PrivateLinkServiceConnections[0].RequestMessage = ""
+			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0]).To(Equal(expectedPrivateEndpoint))
+
+			// wc checks
+
+			// get updated management AzureCluster
+			err = k8sClient.Get(ctx, workloadClusterNamespacedName, workloadAzureCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			// done: workload AzureCluster has right annotations
+			privateEndpointIpForWcApi, ok := workloadAzureCluster.Annotations[privatelinks.AzurePrivateEndpointOperatorApiServerAnnotation]
+			Expect(ok).To(BeTrue())
+			Expect(privateEndpointIpForWcApi).To(Equal(testPrivateEndpointIpForWcAPI))
+
+			privateEndpointIpForMcIngress, ok := workloadAzureCluster.Annotations[privatelinks.AzurePrivateEndpointOperatorMcIngressAnnotation]
+			Expect(ok).To(BeTrue())
+			Expect(privateEndpointIpForMcIngress).To(Equal(testPrivateEndpointIpForMcIngress))
+
+			// done: private endpoint has been added to the WC
+			expectedPrivateEndpointInWc := testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName)).
+				WithLocation(location).
+				WithPrivateLinkServiceConnectionWithName(subscriptionID, managementClusterName, testPrivateLinkNameForMcIngress,
+					fmt.Sprintf("%s-to-%s-connection", workloadClusterName, managementClusterName)).
+				Build()
+			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(1))
+
+			// normalize resource before comparison (we don't care about this field here)
+			workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0].PrivateLinkServiceConnections[0].RequestMessage = ""
+			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0]).To(Equal(expectedPrivateEndpointInWc))
+		})
+	})
+
 	When("workload cluster has been deleted", func() {
 		BeforeEach(func() {
 			// MC AzureCluster resource
 			privateEndpoints := capz.PrivateEndpoints{
-				testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)).
+				testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-privateendpoint", testPrivateLinkNameForWcAPI)).
 					WithLocation(location).
-					WithPrivateLinkServiceConnection(subscriptionID, workloadClusterName, testPrivateLinkName).
+					WithPrivateLinkServiceConnection(subscriptionID, workloadClusterName, testPrivateLinkNameForWcAPI).
 					Build(),
 			}
 			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
 				WithLocation(location).
+				WithAPILoadBalancerType(capz.Public).
 				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
 				Build()
 
 			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
 				WithAPILoadBalancerType(capz.Internal).
-				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
+				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
+				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
 					WithAllowedSubscription(subscriptionID).
 					WithAutoApprovedSubscription(subscriptionID).
 					Build()).
@@ -416,11 +526,13 @@ var _ = Describe("AzureClusterReconciler", func() {
 				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
 					WithLocation(location).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
+					WithAPILoadBalancerType(capz.Public).
 					Build()
 
 				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
 					WithAPILoadBalancerType(capz.Internal).
-					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
+					WithSubnet("test-subnet", capz.SubnetNode, nil).
+					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
 						WithAllowedSubscription(subscriptionID).
 						WithAutoApprovedSubscription(subscriptionID).
 						Build()).
@@ -437,16 +549,18 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		// workload cluster has been created, private links are ready, private endpoint has been
 		// added to the management cluster, but CAPZ still hasn't created the private endpoint
-		When("private endpoint has not been created yet", func() {
+		When("private endpoint in MC has not been created yet", func() {
 			BeforeEach(func() {
 				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
 					WithLocation(location).
+					WithAPILoadBalancerType(capz.Public).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					Build()
 
 				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
 					WithAPILoadBalancerType(capz.Internal).
-					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
+					WithSubnet("test-subnet", capz.SubnetNode, nil).
+					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
 						WithAllowedSubscription(subscriptionID).
 						WithAutoApprovedSubscription(subscriptionID).
 						Build()).
@@ -456,7 +570,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 				privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
 					gomockController := gomock.NewController(GinkgoT())
 					privateEndpointsClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
-					expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
+					expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkNameForWcAPI)
 					testhelpers.SetupPrivateEndpointClientToReturnNotFound(
 						privateEndpointsClient,
 						managementClusterNamespacedName.Name,
@@ -473,19 +587,19 @@ var _ = Describe("AzureClusterReconciler", func() {
 			})
 		})
 
-		// workload cluster has been created, private links are ready, private endpoint has been
-		// added to the management cluster, but private endpoint creation is still in progress on
-		// Azure
-		When("private endpoint doesn't yet have a network interface with private IP", func() {
+		// private endpoint has been added to the workload cluster, but CAPZ still hasn't created the private endpoint
+		When("private endpoint in WC has not been created yet", func() {
 			BeforeEach(func() {
 				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
 					WithLocation(location).
+					WithAPILoadBalancerType(capz.Internal).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					Build()
 
 				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
-					WithAPILoadBalancerType(capz.Internal).
-					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
+					WithAPILoadBalancerType(capz.Public).
+					WithSubnet("test-subnet", capz.SubnetNode, nil).
+					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
 						WithAllowedSubscription(subscriptionID).
 						WithAutoApprovedSubscription(subscriptionID).
 						Build()).
@@ -495,10 +609,91 @@ var _ = Describe("AzureClusterReconciler", func() {
 				privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
 					gomockController := gomock.NewController(GinkgoT())
 					privateEndpointsClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
-					expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
+					expectedPrivateEndpointName := fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName)
+					testhelpers.SetupPrivateEndpointClientToReturnNotFound(
+						privateEndpointsClient,
+						workloadClusterName,
+						expectedPrivateEndpointName)
+
+					return privateEndpointsClient, nil
+				}
+			})
+
+			It("will requeue reconciliation after 1 minute", func(ctx context.Context) {
+				result, err := reconciler.Reconcile(ctx, workloadClusterRequest)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal(expectedResultRequeueAfterMinute))
+			})
+		})
+
+		// workload cluster has been created, private links are ready, private endpoint has been
+		// added to the management cluster, but private endpoint creation is still in progress on
+		// Azure
+		When("private endpoint in MC doesn't yet have a network interface with private IP", func() {
+			BeforeEach(func() {
+				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
+					WithLocation(location).
+					WithSubnet("test-subnet", capz.SubnetNode, nil).
+					WithAPILoadBalancerType(capz.Public).
+					Build()
+
+				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+					WithAPILoadBalancerType(capz.Internal).
+					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
+						WithAllowedSubscription(subscriptionID).
+						WithAutoApprovedSubscription(subscriptionID).
+						Build()).
+					WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+					WithSubnet("test-subnet", capz.SubnetNode, nil).
+					Build()
+
+				privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
+					gomockController := gomock.NewController(GinkgoT())
+					privateEndpointsClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
+					expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkNameForWcAPI)
 					testhelpers.SetupPrivateEndpointClientWithoutPrivateIp(
 						privateEndpointsClient,
 						managementClusterNamespacedName.Name,
+						expectedPrivateEndpointName)
+
+					return privateEndpointsClient, nil
+				}
+			})
+
+			It("will requeue reconciliation after 1 minute", func(ctx context.Context) {
+				result, err := reconciler.Reconcile(ctx, workloadClusterRequest)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal(expectedResultRequeueAfterMinute))
+			})
+		})
+
+		// Private endpoint has been added to the workload cluster,
+		// but private endpoint creation is still in progress on Azure
+		When("private endpoint in WC doesn't yet have a network interface with private IP", func() {
+			BeforeEach(func() {
+				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
+					WithLocation(location).
+					WithSubnet("test-subnet", capz.SubnetNode, nil).
+					WithAPILoadBalancerType(capz.Internal).
+					Build()
+
+				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+					WithAPILoadBalancerType(capz.Public).
+					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
+						WithAllowedSubscription(subscriptionID).
+						WithAutoApprovedSubscription(subscriptionID).
+						Build()).
+					WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+					WithSubnet("test-subnet", capz.SubnetNode, nil).
+					Build()
+
+				privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
+					gomockController := gomock.NewController(GinkgoT())
+					privateEndpointsClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
+					expectedPrivateEndpointName := fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName)
+					testhelpers.SetupPrivateEndpointClientWithoutPrivateIp(
+						privateEndpointsClient,
+						workloadClusterName,
 						expectedPrivateEndpointName)
 
 					return privateEndpointsClient, nil

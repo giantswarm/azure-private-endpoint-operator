@@ -25,7 +25,7 @@ func (b *PrivateEndpointBuilder) WithLocation(location string) *PrivateEndpointB
 
 func (b *PrivateEndpointBuilder) WithPrivateLinkServiceConnection(subscriptionID, resourceGroup, privateLinkName string) *PrivateEndpointBuilder {
 	b.privateLinkServiceConnections = append(b.privateLinkServiceConnections, capz.PrivateLinkServiceConnection{
-		Name: FakePrivateLinkConnectionName(subscriptionID, resourceGroup, privateLinkName),
+		Name: FakePrivateLinkConnectionName(privateLinkName),
 		PrivateLinkServiceID: fmt.Sprintf(
 			"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
 			subscriptionID,
@@ -35,6 +35,17 @@ func (b *PrivateEndpointBuilder) WithPrivateLinkServiceConnection(subscriptionID
 	return b
 }
 
+func (b *PrivateEndpointBuilder) WithPrivateLinkServiceConnectionWithName(subscriptionID, resourceGroup, privateLinkName, connectionName string) *PrivateEndpointBuilder {
+	b.privateLinkServiceConnections = append(b.privateLinkServiceConnections, capz.PrivateLinkServiceConnection{
+		Name: connectionName,
+		PrivateLinkServiceID: fmt.Sprintf(
+			"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
+			subscriptionID,
+			resourceGroup,
+			privateLinkName),
+	})
+	return b
+}
 func (b *PrivateEndpointBuilder) Build() capz.PrivateEndpointSpec {
 	privateEndpoint := capz.PrivateEndpointSpec{
 		Name:                          b.name,
@@ -46,6 +57,6 @@ func (b *PrivateEndpointBuilder) Build() capz.PrivateEndpointSpec {
 	return privateEndpoint
 }
 
-func FakePrivateLinkConnectionName(subscriptionID, resourceGroup, privateLinkName string) string {
+func FakePrivateLinkConnectionName(privateLinkName string) string {
 	return fmt.Sprintf("%s-connection", privateLinkName)
 }

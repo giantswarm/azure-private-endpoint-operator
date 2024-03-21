@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add a new feature that injects private endpoint to workload clusters for WC-to-MC ingress communication for private MCs. 
+
 ## [0.1.1] - 2024-01-22
 
 ### Changed

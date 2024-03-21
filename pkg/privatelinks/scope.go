@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/giantswarm/microerror"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/util/slice"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/giantswarm/microerror"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azurecluster"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
@@ -15,6 +16,7 @@ import (
 
 const (
 	AzurePrivateEndpointOperatorApiServerAnnotation string = "azure-private-endpoint-operator.giantswarm.io/private-link-apiserver-ip"
+	AzurePrivateEndpointOperatorMcIngressAnnotation string = "azure-private-endpoint-operator.giantswarm.io/private-link-mc-ingress-ip"
 )
 
 func NewScope(workloadCluster *capz.AzureCluster, client client.Client) (*Scope, error) {
@@ -74,6 +76,10 @@ func (s *Scope) PrivateLinksReady() bool {
 	return s.IsConditionTrue(capz.PrivateLinksReadyCondition)
 }
 
-func (s *Scope) SetPrivateEndpointIPAddress(ip net.IP) {
+func (s *Scope) SetPrivateEndpointIPAddressForWcApi(ip net.IP) {
 	s.BaseScope.SetAnnotation(AzurePrivateEndpointOperatorApiServerAnnotation, ip.String())
+}
+
+func (s *Scope) SetPrivateEndpointIPAddressForMcIngress(ip net.IP) {
+	s.BaseScope.SetAnnotation(AzurePrivateEndpointOperatorMcIngressAnnotation, ip.String())
 }

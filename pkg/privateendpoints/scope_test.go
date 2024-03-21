@@ -126,7 +126,7 @@ var _ = Describe("Scope", func() {
 				Expect(privateEndpoint.Name).To(Equal(privateEndpointNames[i]))
 				Expect(privateEndpoint.PrivateLinkServiceConnections).To(HaveLen(1))
 				Expect(privateEndpoint.PrivateLinkServiceConnections[0].Name).To(Equal(
-					testhelpers.FakePrivateLinkConnectionName(subscriptionID, resourceGroup, privateLinkName(i))))
+					testhelpers.FakePrivateLinkConnectionName(privateLinkName(i))))
 			}
 		})
 
@@ -145,7 +145,7 @@ var _ = Describe("Scope", func() {
 				Expect(privateEndpoint.Name).To(Equal(privateEndpointNames[i]))
 				Expect(privateEndpoint.PrivateLinkServiceConnections).To(HaveLen(1))
 				Expect(privateEndpoint.PrivateLinkServiceConnections[0].Name).To(Equal(
-					testhelpers.FakePrivateLinkConnectionName(subscriptionID, resourceGroup, privateLinkName(i))))
+					testhelpers.FakePrivateLinkConnectionName(privateLinkName(i))))
 			}
 
 			// Check getting private endpoints to a workload cluster in "other" resource group (newly added in this spec)
@@ -156,7 +156,7 @@ var _ = Describe("Scope", func() {
 				Expect(privateEndpoint.Name).To(Equal(privateEndpointNames[i]))
 				Expect(privateEndpoint.PrivateLinkServiceConnections).To(HaveLen(1))
 				Expect(privateEndpoint.PrivateLinkServiceConnections[0].Name).To(Equal(
-					testhelpers.FakePrivateLinkConnectionName(subscriptionID, otherResourceGroup, privateLinkName(i))))
+					testhelpers.FakePrivateLinkConnectionName(privateLinkName(i))))
 			}
 		})
 

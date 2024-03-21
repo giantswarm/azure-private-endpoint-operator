@@ -86,7 +86,7 @@ var _ = Describe("Service", func() {
 		})
 
 		It("returns SubscriptionCannotConnectToPrivateLink error", func(ctx context.Context) {
-			err = service.Reconcile(ctx)
+			err = service.ReconcileMcToWcApi(ctx)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsSubscriptionCannotConnectToPrivateLinkError(err)).To(BeTrue())
 		})
@@ -133,7 +133,7 @@ var _ = Describe("Service", func() {
 		})
 
 		It("returns PrivateLinksNotReady error", func(ctx context.Context) {
-			err = service.Reconcile(ctx)
+			err = service.ReconcileMcToWcApi(ctx)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsPrivateLinksNotReady(err)).To(BeTrue())
 		})
@@ -197,8 +197,8 @@ var _ = Describe("Service", func() {
 			exists := privateEndpointsScope.ContainsPrivateEndpointSpec(expectedPrivateEndpoint)
 			Expect(exists).To(BeFalse())
 
-			// Reconcile newly created workload cluster
-			err = service.Reconcile(ctx)
+			// ReconcileMcToWcApi newly created workload cluster
+			err = service.ReconcileMcToWcApi(ctx)
 
 			// private endpoint now exists
 			exists = privateEndpointsScope.ContainsPrivateEndpointSpec(expectedPrivateEndpoint)
@@ -229,7 +229,7 @@ var _ = Describe("Service", func() {
 			Expect(exists).To(BeFalse())
 
 			// reconcile newly created workload cluster
-			err = service.Reconcile(ctx)
+			err = service.ReconcileMcToWcApi(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
 			// private endpoint exists
@@ -302,7 +302,7 @@ var _ = Describe("Service", func() {
 			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(1))
 
 			// reconcile newly created workload cluster
-			err = service.Reconcile(ctx)
+			err = service.ReconcileMcToWcApi(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
 			// same private endpoint still exists
@@ -382,7 +382,7 @@ var _ = Describe("Service", func() {
 			Expect(exists).To(BeTrue())
 
 			// reconcile newly created workload cluster
-			err = service.Reconcile(ctx)
+			err = service.ReconcileMcToWcApi(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
 			//// and now there is still just one private endpoint in the MC AzureCluster
@@ -451,7 +451,7 @@ var _ = Describe("Service", func() {
 			Expect(exists).To(BeTrue())
 
 			// reconcile newly created workload cluster
-			err = service.Delete(ctx)
+			err = service.DeleteMcToWcApi(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
 			// and now there are no private endpoints in the MC AzureCluster

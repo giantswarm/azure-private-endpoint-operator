@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/giantswarm/microerror"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/util/slice"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/giantswarm/microerror"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
 )
@@ -24,7 +25,8 @@ type PrivateLinksScope interface {
 	LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLink, bool)
 	PatchObject(ctx context.Context) error
 	PrivateLinksReady() bool
-	SetPrivateEndpointIPAddress(ip net.IP)
+	SetPrivateEndpointIPAddressForWcApi(ip net.IP)
+	SetPrivateEndpointIPAddressForMcIngress(ip net.IP)
 	Close(ctx context.Context) error
 }
 
@@ -47,7 +49,7 @@ func NewService(privateEndpointsScope Scope, privateLinksScope PrivateLinksScope
 	}, nil
 }
 
-func (s *Service) Reconcile(ctx context.Context) error {
+func (s *Service) ReconcileMcToWcApi(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 	//
 	// First get all workload cluster private links. We will create private endpoints for all of
@@ -112,7 +114,7 @@ func (s *Service) Reconcile(ctx context.Context) error {
 			return microerror.Mask(err)
 		}
 		logger.Info("found private endpoint IP address in MC", "ipAddress", privateEndpointIPAddress.String())
-		s.privateLinksScope.SetPrivateEndpointIPAddress(privateEndpointIPAddress)
+		s.privateLinksScope.SetPrivateEndpointIPAddressForWcApi(privateEndpointIPAddress)
 		logger.Info("set private endpoint IP address in WC AzureCluster", "ipAddress", privateEndpointIPAddress.String())
 	}
 
@@ -143,7 +145,24 @@ func (s *Service) Reconcile(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) Delete(_ context.Context) error {
+func (s *Service) ReconcileWcToMcIngress(ctx context.Context, wcToMcSpec capz.PrivateEndpointSpec) error {
+	logger := log.FromContext(ctx)
+
+	s.privateEndpointsScope.AddPrivateEndpointSpec(wcToMcSpec)
+	logger.Info(fmt.Sprintf("Ensured private endpoint %s is added to %s", wcToMcSpec.Name, s.privateEndpointsScope.GetClusterName()))
+
+	privateEndpointIPAddress, err := s.privateEndpointsScope.GetPrivateEndpointIPAddress(ctx, wcToMcSpec.Name)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+	logger.Info("found private endpoint IP address in WC for ingress", "ipAddress", privateEndpointIPAddress.String())
+	s.privateLinksScope.SetPrivateEndpointIPAddressForMcIngress(privateEndpointIPAddress)
+	logger.Info("set private endpoint IP address in WC AzureCluster for ingress", "ipAddress", privateEndpointIPAddress.String())
+
+	return nil
+}
+
+func (s *Service) DeleteMcToWcApi(_ context.Context) error {
 	// First get all workload cluster private links. We will delete private endpoints for all of
 	// them.
 	privateLinks := s.privateLinksScope.GetPrivateLinksWithAllowedSubscription(s.privateEndpointsScope.GetSubscriptionID())

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add toleration for `node.cluster.x-k8s.io/uninitialized` taint.
+- Add node affinity to prefer schedule to `control-plane` nodes.
+
 ## [0.2.0] - 2024-03-21
 
 ### Added

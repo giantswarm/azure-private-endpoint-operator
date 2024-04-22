@@ -44,6 +44,16 @@ rules:
   - create
   - patch
 #
+# Secrets: Necessary when AzureClusterIdentity's type is ManualServicePrincipal
+#
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - patch
+#
 # AzureClusterIdentity
 #
 - apiGroups:

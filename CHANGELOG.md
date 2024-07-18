@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2024-07-18
+
 ## [0.2.2] - 2024-04-22
 
 ## [0.2.1] - 2024-04-22
@@ -50,7 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated Dockerfile
 
-[Unreleased]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.1.1...v0.2.0

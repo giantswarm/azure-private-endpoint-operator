@@ -371,21 +371,22 @@ var _ = Describe("AzureClusterReconciler", func() {
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
-			privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
+			privateEndpointsClientCreator = func(_ context.Context, _ client.Client, cluster *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
 				gomockController := gomock.NewController(GinkgoT())
 				privateEndpointsClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
-				testhelpers.SetupPrivateEndpointClientToReturnPrivateIp(
-					privateEndpointsClient,
-					managementClusterName,
-					fmt.Sprintf("%s-privateendpoint", testPrivateLinkNameForWcAPI),
-					testPrivateEndpointIpForWcAPI)
-
-				testhelpers.SetupPrivateEndpointClientToReturnPrivateIp(
-					privateEndpointsClient,
-					workloadClusterName,
-					fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName),
-					testPrivateEndpointIpForMcIngress)
-
+				if cluster.Name == managementClusterName {
+					testhelpers.SetupPrivateEndpointClientToReturnPrivateIp(
+						privateEndpointsClient,
+						managementClusterName,
+						fmt.Sprintf("%s-privateendpoint", testPrivateLinkNameForWcAPI),
+						testPrivateEndpointIpForWcAPI)
+				} else {
+					testhelpers.SetupPrivateEndpointClientToReturnPrivateIp(
+						privateEndpointsClient,
+						workloadClusterName,
+						fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName),
+						testPrivateEndpointIpForMcIngress)
+				}
 				return privateEndpointsClient, nil
 			}
 		})
@@ -567,15 +568,16 @@ var _ = Describe("AzureClusterReconciler", func() {
 					WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
 					Build()
 
-				privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
+				privateEndpointsClientCreator = func(_ context.Context, _ client.Client, cluster *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
 					gomockController := gomock.NewController(GinkgoT())
 					privateEndpointsClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
-					expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkNameForWcAPI)
-					testhelpers.SetupPrivateEndpointClientToReturnNotFound(
-						privateEndpointsClient,
-						managementClusterNamespacedName.Name,
-						expectedPrivateEndpointName)
-
+					if cluster.Name == managementClusterName {
+						expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkNameForWcAPI)
+						testhelpers.SetupPrivateEndpointClientToReturnNotFound(
+							privateEndpointsClient,
+							managementClusterNamespacedName.Name,
+							expectedPrivateEndpointName)
+					}
 					return privateEndpointsClient, nil
 				}
 			})
@@ -606,15 +608,16 @@ var _ = Describe("AzureClusterReconciler", func() {
 					WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
 					Build()
 
-				privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
+				privateEndpointsClientCreator = func(_ context.Context, _ client.Client, cluster *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
 					gomockController := gomock.NewController(GinkgoT())
 					privateEndpointsClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
-					expectedPrivateEndpointName := fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName)
-					testhelpers.SetupPrivateEndpointClientToReturnNotFound(
-						privateEndpointsClient,
-						workloadClusterName,
-						expectedPrivateEndpointName)
-
+					if cluster.Name == workloadClusterName {
+						expectedPrivateEndpointName := fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName)
+						testhelpers.SetupPrivateEndpointClientToReturnNotFound(
+							privateEndpointsClient,
+							workloadClusterName,
+							expectedPrivateEndpointName)
+					}
 					return privateEndpointsClient, nil
 				}
 			})
@@ -647,14 +650,16 @@ var _ = Describe("AzureClusterReconciler", func() {
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					Build()
 
-				privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
+				privateEndpointsClientCreator = func(_ context.Context, _ client.Client, cluster *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
 					gomockController := gomock.NewController(GinkgoT())
 					privateEndpointsClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
-					expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkNameForWcAPI)
-					testhelpers.SetupPrivateEndpointClientWithoutPrivateIp(
-						privateEndpointsClient,
-						managementClusterNamespacedName.Name,
-						expectedPrivateEndpointName)
+					if cluster.Name == managementClusterName {
+						expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkNameForWcAPI)
+						testhelpers.SetupPrivateEndpointClientWithoutPrivateIp(
+							privateEndpointsClient,
+							managementClusterNamespacedName.Name,
+							expectedPrivateEndpointName)
+					}
 
 					return privateEndpointsClient, nil
 				}
@@ -687,15 +692,16 @@ var _ = Describe("AzureClusterReconciler", func() {
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					Build()
 
-				privateEndpointsClientCreator = func(context.Context, client.Client, *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
+				privateEndpointsClientCreator = func(_ context.Context, _ client.Client, cluster *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
 					gomockController := gomock.NewController(GinkgoT())
 					privateEndpointsClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
-					expectedPrivateEndpointName := fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName)
-					testhelpers.SetupPrivateEndpointClientWithoutPrivateIp(
-						privateEndpointsClient,
-						workloadClusterName,
-						expectedPrivateEndpointName)
-
+					if cluster.Name == workloadClusterName {
+						expectedPrivateEndpointName := fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName)
+						testhelpers.SetupPrivateEndpointClientWithoutPrivateIp(
+							privateEndpointsClient,
+							workloadClusterName,
+							expectedPrivateEndpointName)
+					}
 					return privateEndpointsClient, nil
 				}
 			})

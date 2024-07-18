@@ -127,13 +127,18 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Create MC private endpoints scope - we use this to get the info about the management cluster
 	// private endpoints and to update them.
-	privateEndpointsClient, err := r.privateEndpointsClientCreator(ctx, r.Client, &managementAzureCluster)
+	mcPrivateEndpointsClient, err := r.privateEndpointsClientCreator(ctx, r.Client, &managementAzureCluster)
+	if err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
+	}
+
+	wcPrivateEndpointsClient, err := r.privateEndpointsClientCreator(ctx, r.Client, &workloadAzureCluster)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
 	// will be used for MC to WC connections
-	mcPrivateEndpointsScope, err := privateendpoints.NewScope(ctx, &managementAzureCluster, r.Client, privateEndpointsClient)
+	mcPrivateEndpointsScope, err := privateendpoints.NewScope(ctx, &managementAzureCluster, r.Client, mcPrivateEndpointsClient)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
@@ -146,7 +151,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// will be used for WC to MC connections
 	// we don't need to close this scope here. WC will be patched by privateLinksScope.Close above.
-	wcPrivateEndpointsScope, err := privateendpoints.NewScope(ctx, &workloadAzureCluster, r.Client, privateEndpointsClient)
+	wcPrivateEndpointsScope, err := privateendpoints.NewScope(ctx, &workloadAzureCluster, r.Client, wcPrivateEndpointsClient)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}

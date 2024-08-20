@@ -68,7 +68,7 @@ func (s *Service) ReconcileMcToWcApi(ctx context.Context) error {
 	if len(privateLinks) > 0 && !s.privateLinksScope.PrivateLinksReady() {
 		errorMessage := "Workload cluster private links are not yet ready"
 		logger.Info(errorMessage)
-		return microerror.Maskf(errors.PrivateLinksNotReadyError, errorMessage)
+		return microerror.Maskf(errors.PrivateLinksNotReadyError, "%s", errorMessage)
 	}
 
 	//

@@ -139,7 +139,7 @@ func (s *scope) GetPrivateEndpointIPAddress(ctx context.Context, privateEndpoint
 	} else {
 		return result, microerror.Maskf(
 			errors.PrivateEndpointNetworkInterfacePrivateAddressNotFoundError,
-			fmt.Sprintf("could not find private endpoint network interface private IP address, got private endpoint: %v", privateEndpoint))
+			"could not find private endpoint network interface private IP address, got private endpoint: %v", privateEndpoint)
 	}
 }
 

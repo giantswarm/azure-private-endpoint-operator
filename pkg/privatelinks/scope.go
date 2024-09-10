@@ -11,6 +11,7 @@ import (
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azurecluster"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
 )
 
 const (
@@ -63,7 +64,7 @@ func (s *Scope) LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLin
 func (s *Scope) GetPrivateLinksWithAllowedSubscription(managementClusterSubscriptionID string) []capz.PrivateLink {
 	var privateLinksWhereMCSubscriptionIsAllowed []capz.PrivateLink
 	for _, privateLink := range s.privateLinks {
-		if containsPtr(privateLink.AllowedSubscriptions, managementClusterSubscriptionID) {
+		if util.ContainsPtr(privateLink.AllowedSubscriptions, managementClusterSubscriptionID) {
 			privateLinksWhereMCSubscriptionIsAllowed = append(privateLinksWhereMCSubscriptionIsAllowed, privateLink)
 		}
 	}
@@ -80,13 +81,4 @@ func (s *Scope) SetPrivateEndpointIPAddressForWcApi(ip net.IP) {
 
 func (s *Scope) SetPrivateEndpointIPAddressForMcIngress(ip net.IP) {
 	s.BaseScope.SetAnnotation(AzurePrivateEndpointOperatorMcIngressAnnotation, ip.String())
-}
-
-func containsPtr(slice []*string, str string) bool {
-	for _, v := range slice {
-		if v != nil && *v == str {
-			return true
-		}
-	}
-	return false
 }

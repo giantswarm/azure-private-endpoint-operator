@@ -30,8 +30,11 @@ import (
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure"
@@ -74,7 +77,7 @@ func main() {
 	flag.DurationVar(&syncPeriod, "sync-period", 5*time.Minute,
 		"The minimum interval at which watched resources are reconciled (e.g. 15m)")
 	opts := zap.Options{
-		Development: true,
+		Development: false,
 		TimeEncoder: zapcore.ISO8601TimeEncoder,
 	}
 	opts.BindFlags(flag.CommandLine)
@@ -83,13 +86,19 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer: webhook.NewServer(
+			webhook.Options{
+				Port: 9443,
+			},
+		),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "0934d11a.giantswarm.io",
-		SyncPeriod:             &syncPeriod,
+		Cache:                  cache.Options{SyncPeriod: &syncPeriod},
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly

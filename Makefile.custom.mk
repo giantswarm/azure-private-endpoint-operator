@@ -40,7 +40,7 @@ help: ## Display this help.
 
 .PHONY: generate
 generate: controller-gen mockgen ## Generate go code.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	# $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 	go generate ./...
 
 .PHONY: fmt

@@ -16,6 +16,8 @@ import (
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 )
 
+var linkName = "test-private-link"
+
 var _ = Describe("Scope", func() {
 	var subscriptionID string
 	var resourceGroup string
@@ -63,13 +65,13 @@ var _ = Describe("Scope", func() {
 	})
 
 	Describe("looking up a private link with its resource ID", func() {
-		var privateLinkNames []string
+		var privateLinkNames []*string
 		var scope *privatelinks.Scope
 
 		JustBeforeEach(func() {
 			azureClusterBuilder := testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup)
 			for _, privateLinkName := range privateLinkNames {
-				azureClusterBuilder.WithPrivateLink(testhelpers.NewPrivateLinkBuilder(privateLinkName).Build())
+				azureClusterBuilder.WithPrivateLink(testhelpers.NewPrivateLinkBuilder(*privateLinkName).Build())
 			}
 			azureCluster := azureClusterBuilder.Build()
 			capzSchema, err := capz.SchemeBuilder.Build()
@@ -83,8 +85,8 @@ var _ = Describe("Scope", func() {
 
 		When("AzureCluster has one private link", func() {
 			BeforeEach(func() {
-				privateLinkNames = []string{
-					"test-private-link",
+				privateLinkNames = []*string{
+					&linkName,
 				}
 			})
 
@@ -93,10 +95,10 @@ var _ = Describe("Scope", func() {
 					"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
 					subscriptionID,
 					resourceGroup,
-					privateLinkNames[0])
+					*privateLinkNames[0])
 				privateLink, ok := scope.LookupPrivateLink(privateLinkID)
 				Expect(ok).To(BeTrue())
-				Expect(privateLink.Name).To(Equal(privateLinkNames[0]))
+				Expect(privateLink.Name).To(Equal(*privateLinkNames[0]))
 			})
 
 			It("doesn't find the private link when looking up with an incorrect resource ID", func() {
@@ -112,9 +114,11 @@ var _ = Describe("Scope", func() {
 
 		When("AzureCluster has multiple private links", func() {
 			BeforeEach(func() {
-				privateLinkNames = []string{
-					"test-private-link-1",
-					"test-private-link-2",
+				linkName1 := "test-private-link-1"
+				linkName2 := "test-private-link-2"
+				privateLinkNames = []*string{
+					&linkName1,
+					&linkName2,
 				}
 			})
 
@@ -124,10 +128,10 @@ var _ = Describe("Scope", func() {
 						"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
 						subscriptionID,
 						resourceGroup,
-						privateLinkName)
+						*privateLinkName)
 					privateLink, ok := scope.LookupPrivateLink(privateLinkID)
 					Expect(ok).To(BeTrue())
-					Expect(privateLink.Name).To(Equal(privateLinkName))
+					Expect(privateLink.Name).To(Equal(*privateLinkName))
 				}
 			})
 		})
@@ -172,7 +176,7 @@ var _ = Describe("Scope", func() {
 				privateLinks := scope.GetPrivateLinksWithAllowedSubscription(subscriptionID)
 				Expect(privateLinks).To(HaveLen(1))
 				Expect(privateLinks[0].Name).To(Equal(privateLinkName))
-				Expect(privateLinks[0].AllowedSubscriptions).To(Equal(privateLinksWithAllowedSubscriptions[privateLinkName]))
+				Expect(privateLinks[0].AllowedSubscriptions).To(ConsistOf(&subscriptionID))
 			})
 
 			It("doesn't get a private link for the disallowed subscription ID", func() {
@@ -199,7 +203,7 @@ var _ = Describe("Scope", func() {
 				privateLinks := scope.GetPrivateLinksWithAllowedSubscription(subscriptionID)
 				Expect(privateLinks).To(HaveLen(1))
 				Expect(privateLinks[0].Name).To(Equal(privateLinkName))
-				Expect(privateLinks[0].AllowedSubscriptions).To(Equal(privateLinksWithAllowedSubscriptions[privateLinkName]))
+				Expect(privateLinks[0].AllowedSubscriptions).To(ConsistOf(&subscriptionID))
 			})
 		})
 	})

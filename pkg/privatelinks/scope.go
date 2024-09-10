@@ -5,13 +5,13 @@ import (
 	"net"
 
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	"sigs.k8s.io/cluster-api-provider-azure/util/slice"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/microerror"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azurecluster"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
 )
 
 const (
@@ -64,11 +64,10 @@ func (s *Scope) LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLin
 func (s *Scope) GetPrivateLinksWithAllowedSubscription(managementClusterSubscriptionID string) []capz.PrivateLink {
 	var privateLinksWhereMCSubscriptionIsAllowed []capz.PrivateLink
 	for _, privateLink := range s.privateLinks {
-		if slice.Contains(privateLink.AllowedSubscriptions, managementClusterSubscriptionID) {
+		if util.ContainsPtr(privateLink.AllowedSubscriptions, managementClusterSubscriptionID) {
 			privateLinksWhereMCSubscriptionIsAllowed = append(privateLinksWhereMCSubscriptionIsAllowed, privateLink)
 		}
 	}
-
 	return privateLinksWhereMCSubscriptionIsAllowed
 }
 

@@ -6,8 +6,8 @@ import (
 
 type PrivateLinkBuilder struct {
 	name                      string
-	allowedSubscriptions      []string
-	autoApprovedSubscriptions []string
+	allowedSubscriptions      []*string
+	autoApprovedSubscriptions []*string
 }
 
 func NewPrivateLinkBuilder(name string) *PrivateLinkBuilder {
@@ -17,12 +17,12 @@ func NewPrivateLinkBuilder(name string) *PrivateLinkBuilder {
 }
 
 func (b *PrivateLinkBuilder) WithAllowedSubscription(subscriptionID string) *PrivateLinkBuilder {
-	b.allowedSubscriptions = append(b.allowedSubscriptions, subscriptionID)
+	b.allowedSubscriptions = append(b.allowedSubscriptions, &subscriptionID)
 	return b
 }
 
 func (b *PrivateLinkBuilder) WithAutoApprovedSubscription(subscriptionID string) *PrivateLinkBuilder {
-	b.autoApprovedSubscriptions = append(b.autoApprovedSubscriptions, subscriptionID)
+	b.autoApprovedSubscriptions = append(b.autoApprovedSubscriptions, &subscriptionID)
 	return b
 }
 

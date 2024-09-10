@@ -16,6 +16,8 @@ import (
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 )
 
+var linkName = "test-private-link"
+
 var _ = Describe("Scope", func() {
 	var subscriptionID string
 	var resourceGroup string
@@ -83,7 +85,6 @@ var _ = Describe("Scope", func() {
 
 		When("AzureCluster has one private link", func() {
 			BeforeEach(func() {
-				linkName := "test-private-link"
 				privateLinkNames = []*string{
 					&linkName,
 				}

@@ -5,7 +5,6 @@ import (
 	"net"
 
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	"sigs.k8s.io/cluster-api-provider-azure/util/slice"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/microerror"
@@ -64,11 +63,10 @@ func (s *Scope) LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLin
 func (s *Scope) GetPrivateLinksWithAllowedSubscription(managementClusterSubscriptionID string) []capz.PrivateLink {
 	var privateLinksWhereMCSubscriptionIsAllowed []capz.PrivateLink
 	for _, privateLink := range s.privateLinks {
-		if slice.Contains(privateLink.AllowedSubscriptions, managementClusterSubscriptionID) {
+		if containsPtr(privateLink.AllowedSubscriptions, managementClusterSubscriptionID) {
 			privateLinksWhereMCSubscriptionIsAllowed = append(privateLinksWhereMCSubscriptionIsAllowed, privateLink)
 		}
 	}
-
 	return privateLinksWhereMCSubscriptionIsAllowed
 }
 
@@ -82,4 +80,13 @@ func (s *Scope) SetPrivateEndpointIPAddressForWcApi(ip net.IP) {
 
 func (s *Scope) SetPrivateEndpointIPAddressForMcIngress(ip net.IP) {
 	s.BaseScope.SetAnnotation(AzurePrivateEndpointOperatorMcIngressAnnotation, ip.String())
+}
+
+func containsPtr(slice []*string, str string) bool {
+	for _, v := range slice {
+		if v != nil && *v == str {
+			return true
+		}
+	}
+	return false
 }

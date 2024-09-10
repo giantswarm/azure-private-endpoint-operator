@@ -13,6 +13,7 @@ import (
 	"github.com/giantswarm/microerror"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
 )
 
 // PrivateLinksScope is the interface for getting private links for which the private endpoints are needed.
@@ -76,7 +77,7 @@ func (s *Service) ReconcileMcToWcApi(ctx context.Context) error {
 	//
 	for _, privateLink := range privateLinks {
 		logger.Info(fmt.Sprintf("Found private link %s", privateLink.Name))
-		manualApproval := !slice.Contains(privateLink.AutoApprovedSubscriptions, s.privateEndpointsScope.GetSubscriptionID())
+		manualApproval := !slice.Contains(util.ConvertToStringSlice(privateLink.AutoApprovedSubscriptions), s.privateEndpointsScope.GetSubscriptionID())
 		var requestMessage string
 		if manualApproval {
 			requestMessage = fmt.Sprintf("Giant Swarm azure-private-endpoint-operator that is running in "+

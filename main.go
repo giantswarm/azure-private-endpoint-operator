@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	webhookserver "sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure"
@@ -90,8 +90,8 @@ func main() {
 		Metrics: metricsserver.Options{
 			BindAddress: metricsAddr,
 		},
-		WebhookServer: webhook.NewServer(
-			webhook.Options{
+		WebhookServer: webhookserver.NewServer(
+			webhookserver.Options{
 				Port: 9443,
 			},
 		),

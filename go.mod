@@ -22,7 +22,6 @@ require (
 )
 
 require (
-	dario.cat/mergo v1.0.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5 v5.7.0 // indirect
 	github.com/Azure/azure-service-operator/v2 v2.8.0 // indirect
@@ -109,6 +108,6 @@ require (
 )
 
 replace (
-	github.com/imdario/mergo => dario.cat/mergo v1.0.0
+	github.com/imdario/mergo => github.com/imdario/mergo v0.3.16
 	sigs.k8s.io/cluster-api-provider-azure => github.com/giantswarm/cluster-api-provider-azure v1.12.4-gs.alpha.2
 )

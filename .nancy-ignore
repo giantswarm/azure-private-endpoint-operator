@@ -1,7 +1,5 @@
-# https://ossindex.sonatype.org/vulnerability/CVE-2020-8561
-CVE-2020-8561
-CVE-2023-39325
-CVE-2023-3978
+# pkg:golang/golang.org/x/net@v0.32.0
+CVE-2024-45338
 
-# pkg:golang/golang.org/x/net@v0.29.0
-CVE-2024-8421
+# pkg:golang/github.com/golang-jwt/jwt/v4@v4.5.0
+CVE-2024-51744

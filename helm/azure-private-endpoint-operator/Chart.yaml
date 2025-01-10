@@ -13,5 +13,5 @@ home: https://github.com/giantswarm/azure-private-endpoint-operator
 
 # icon: https://s.giantswarm.io/app-icons/example/1/light.svg
 annotations:
-  application.giantswarm.io/team: turtles
+  application.giantswarm.io/team: phoenix
   config.giantswarm.io/version: 1.x.x

@@ -83,7 +83,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// First we get workload cluster AzureCluster CR, and we check if the cluster is private or public.
 	var workloadAzureCluster capz.AzureCluster
-	err = r.Client.Get(ctx, req.NamespacedName, &workloadAzureCluster)
+	err = r.Get(ctx, req.NamespacedName, &workloadAzureCluster)
 	if apierrors.IsNotFound(err) {
 		logger.Info("AzureCluster no longer exists")
 		return ctrl.Result{}, nil
@@ -99,7 +99,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	var managementAzureCluster capz.AzureCluster
-	if err = r.Client.Get(ctx, r.managementClusterName, &managementAzureCluster); err != nil {
+	if err = r.Get(ctx, r.managementClusterName, &managementAzureCluster); err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 

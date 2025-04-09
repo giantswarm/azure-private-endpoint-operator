@@ -76,9 +76,9 @@ func (s *Scope) PrivateLinksReady() bool {
 }
 
 func (s *Scope) SetPrivateEndpointIPAddressForWcApi(ip net.IP) {
-	s.BaseScope.SetAnnotation(AzurePrivateEndpointOperatorApiServerAnnotation, ip.String())
+	s.SetAnnotation(AzurePrivateEndpointOperatorApiServerAnnotation, ip.String())
 }
 
 func (s *Scope) SetPrivateEndpointIPAddressForMcIngress(ip net.IP) {
-	s.BaseScope.SetAnnotation(AzurePrivateEndpointOperatorMcIngressAnnotation, ip.String())
+	s.SetAnnotation(AzurePrivateEndpointOperatorMcIngressAnnotation, ip.String())
 }

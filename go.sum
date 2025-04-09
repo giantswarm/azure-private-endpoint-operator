@@ -20,8 +20,8 @@ github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v6 v6.2
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v6 v6.2.0/go.mod h1:ulHyBFJOI0ONiRL4vcJTmS7rx18jQQlEPmAgo80cRdM=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 h1:Dd+RhdJn0OTtVGaeDLZpcumkIVCtA/3/Fo42+eoYvVM=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0/go.mod h1:5kakwfW5CjC9KK+Q4wjXAg+ShuIm2mBMua0ZFj2C8PE=
-github.com/Azure/azure-service-operator/v2 v2.8.0 h1:VeXvLrgMD3/LEbyuSddDTcnGR0CK+YE2vKRvx1tiY4k=
-github.com/Azure/azure-service-operator/v2 v2.8.0/go.mod h1:ezbJS56PcORFFqLV8XZmM9xZ12m6aGAkg353fQhWD/8=
+github.com/Azure/azure-service-operator/v2 v2.9.0 h1:I8mzcN79Urc+Z/+zNwrfjfK8WS3tVHoWr9QIwbiEarI=
+github.com/Azure/azure-service-operator/v2 v2.9.0/go.mod h1:4j0Vk2JkLDGDdLWotWVLof7+laRkoxTA6apc39AH/5A=
 github.com/Azure/go-autorest v14.2.0+incompatible h1:V5VMDjClD3GiElqLWO7mz2MxNAK/vTfRHdAubSIPRgs=
 github.com/Azure/go-autorest v14.2.0+incompatible/go.mod h1:r+4oMnoxhatjLLJ6zxSWATqVooLgysK6ZNox3g/xq24=
 github.com/Azure/go-autorest/autorest v0.11.28/go.mod h1:MrkzG3Y3AH668QyF9KRk5neJnGgmhQ6krbhR8Q5eMvA=

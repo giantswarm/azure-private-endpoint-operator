@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Update github.com/Azure/azure-service-operator/v2 from v2.8.0 to v2.9.0 to resolve build issue
+
 ## [0.2.4] - 2025-01-10
 
 ### Fixed
@@ -28,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add a new feature that injects private endpoint to workload clusters for WC-to-MC ingress communication for private MCs. 
+- Add a new feature that injects private endpoint to workload clusters for WC-to-MC ingress communication for private MCs.
 
 ## [0.1.1] - 2024-01-22
 

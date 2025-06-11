@@ -64,6 +64,14 @@ func NewPrivateEndpointClient(ctx context.Context, client client.Client, azureCl
 		if err != nil {
 			return nil, microerror.Mask(err)
 		}
+	case capz.WorkloadIdentity:
+		cred, err = azidentity.NewWorkloadIdentityCredential(&azidentity.WorkloadIdentityCredentialOptions{
+			ClientID: azureClusterIdentity.Spec.ClientID,
+			TenantID: azureClusterIdentity.Spec.TenantID,
+		})
+		if err != nil {
+			return nil, microerror.Mask(err)
+		}
 	}
 
 	privateEndpointsClient, err := armnetwork.NewPrivateEndpointsClient(azureCluster.Spec.SubscriptionID, cred, nil)

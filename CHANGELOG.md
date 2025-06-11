@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add support for worklad identity to be used for authentication.
+
 ### Fixed
 
 - Update github.com/Azure/azure-service-operator/v2 from v2.8.0 to v2.9.0 to resolve build issue

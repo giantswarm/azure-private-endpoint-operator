@@ -16,6 +16,9 @@ spec:
         kubectl.kubernetes.io/default-container: {{ .Chart.Name }}
       labels:
         {{- include "labels.selector" . | nindent 8 }}
+        {{- if .Values.azure.workloadIdentity.clientID }}
+        azure.workload.identity/use: "true"
+        {{- end }}
     spec:
       affinity:
         nodeAffinity:

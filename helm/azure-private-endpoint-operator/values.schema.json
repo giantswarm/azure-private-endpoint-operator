@@ -2,6 +2,19 @@
     "$schema": "http://json-schema.org/schema#",
     "type": "object",
     "properties": {
+        "azure": {
+            "type": "object",
+            "properties": {
+                "workloadIdentity": {
+                    "type": "object",
+                    "properties": {
+                        "clientID": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "global": {
             "type": "object",
             "properties": {

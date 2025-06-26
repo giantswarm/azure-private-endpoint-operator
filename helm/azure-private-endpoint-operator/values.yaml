@@ -38,3 +38,7 @@ managementCluster:
 global:
   podSecurityStandards:
     enforced: false
+
+azure:
+  workloadIdentity:
+    clientID: ""

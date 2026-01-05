@@ -99,6 +99,9 @@
                 "allowPrivilegeEscalation": {
                     "type": "boolean"
                 },
+                "readOnlyRootFilesystem": {
+                    "type": "boolean"
+                },
                 "capabilities": {
                     "type": "object"
                 },

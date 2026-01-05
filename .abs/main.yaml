@@ -4,4 +4,5 @@ generate-metadata: true
 chart-dir: ./helm/azure-private-endpoint-operator
 destination: build
 catalog-base-url: https://giantswarm.github.io/control-plane-catalog/
+kubelinter-config: .abs/.kube-linter.yaml
 

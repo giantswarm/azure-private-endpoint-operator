@@ -62,6 +62,9 @@ spec:
           containerPort: 8777
           hostPort: 8777
           protocol: TCP
+        - name: health
+          containerPort: 8081
+          protocol: TCP
         livenessProbe:
           httpGet:
             path: /healthz

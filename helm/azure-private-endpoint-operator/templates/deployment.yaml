@@ -39,7 +39,7 @@ spec:
       hostNetwork: true
       containers:
       - name: {{ .Chart.Name }}
-        image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+        image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ include "image.tag" . }}"
         imagePullPolicy: "{{ .Values.image.pullPolicy }}"
         command:
         - /manager
@@ -61,6 +61,9 @@ spec:
         - name: metrics
           containerPort: 8777
           hostPort: 8777
+          protocol: TCP
+        - name: health
+          containerPort: 8081
           protocol: TCP
         livenessProbe:
           httpGet:

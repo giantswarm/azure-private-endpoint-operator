@@ -1,14 +1,10 @@
 name: azure-private-endpoint-operator
 serviceType: managed
 
-project:
-  branch: "[[ .Branch ]]"
-  commit: "[[ .SHA ]]"
-
 image:
   registry: gsoci.azurecr.io
   name: giantswarm/azure-private-endpoint-operator
-  tag: "[[ .Version ]]"
+  tag: ""
   pullPolicy: IfNotPresent
 
 pod:
@@ -27,6 +23,7 @@ securityContext:
   seccompProfile:
     type: RuntimeDefault
   allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
   capabilities:
     drop:
       - ALL

@@ -2,8 +2,6 @@ module github.com/giantswarm/azure-private-endpoint-operator
 
 go 1.24.0
 
-toolchain go1.25.4
-
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.20.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1

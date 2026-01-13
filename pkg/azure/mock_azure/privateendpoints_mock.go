@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	armnetwork "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v7"
+	armnetwork "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v8"
 	gomock "go.uber.org/mock/gomock"
 )
 

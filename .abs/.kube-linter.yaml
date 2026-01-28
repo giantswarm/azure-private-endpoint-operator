@@ -1,0 +1,5 @@
+checks:
+  exclude:
+    # Operator requires hostNetwork for Azure private endpoint operations
+    - "host-network"
+

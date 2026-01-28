@@ -6,6 +6,5 @@ description: Operator for reconciling Azure Private Links in CAPZ workload clust
 home: https://github.com/giantswarm/azure-private-endpoint-operator
 icon: https://s.giantswarm.io/app-icons/giantswarm/1/dark.svg
 annotations:
-  application.giantswarm.io/team: phoenix
   io.giantswarm.application.team: phoenix
   config.giantswarm.io/version: 1.x.x

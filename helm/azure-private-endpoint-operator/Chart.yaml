@@ -1,7 +1,7 @@
 apiVersion: v2
 name: azure-private-endpoint-operator
-version: 0.4.0-dev
-appVersion: 0.4.0-dev
+version: 0.3.2
+appVersion: 0.3.2
 description: Operator for reconciling Azure Private Links in CAPZ workload clusters to Azure Private Endpoints in CAPZ management clusters
 home: https://github.com/giantswarm/azure-private-endpoint-operator
 icon: https://s.giantswarm.io/app-icons/giantswarm/1/dark.svg

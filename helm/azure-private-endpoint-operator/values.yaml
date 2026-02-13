@@ -32,10 +32,6 @@ managementCluster:
   name: PLACEHOLDER
   namespace: org-giantswarm
 
-global:
-  podSecurityStandards:
-    enforced: false
-
 azure:
   workloadIdentity:
     clientID: ""

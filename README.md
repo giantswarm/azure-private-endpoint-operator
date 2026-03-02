@@ -19,7 +19,7 @@ If the workload cluster is private,
 Private management clusters use internal load balancer for api server and ingresses, which means the WC cannot access them by default.
 WCs don't need to access MC's api server, but they need to access the ingresses of MCs because of monitoring tools.
 
-- We create a private link `<mc-name>-ingress-privatelink` for the MC once while creating the MC.
+- We create a private link `<mc-name>-gateway-privatelink` for the MC once while creating the MC.
 - This operator watches `AzureCluster` of workload clusters. It injects private endpoints to `AzureCluster` CR of workload clusters.
 - CAPZ creates the private endpoints `<wc-name>-to-<mc-name>-privatelink-privateendpoint` in WC's VNET.
 - This operator also adds the annotation `azure-private-endpoint-operator.giantswarm.io/private-link-mc-ingress-ip` to `AzureCluster` of workload clusters.

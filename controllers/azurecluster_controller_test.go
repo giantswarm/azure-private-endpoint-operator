@@ -27,7 +27,7 @@ import (
 const (
 	testPrivateLinkNameForWcAPI       = "super-private-link"
 	testPrivateEndpointIpForWcAPI     = "10.10.10.10"
-	testPrivateLinkNameForMcIngress   = "giant-ingress-privatelink"
+	testPrivateLinkNameForMcIngress   = "giant-gateway-privatelink"
 	testPrivateEndpointIpForMcIngress = "10.10.10.11"
 )
 

@@ -207,7 +207,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 // generateWcToMcPrivateEndpointSpec generates a PrivateEndpointSpec for the private endpoint that
 // connects the WC to the ingress of management cluster.
-// It assumes we already have a private link with name "<mc-name>-ingress-privatelink".
+// It assumes we already have a private link with name "<mc-name>-gateway-privatelink".
 func generateWcToMcPrivateEndpointSpec(wc capz.AzureCluster, mc capz.AzureCluster) capz.PrivateEndpointSpec {
 	return capz.PrivateEndpointSpec{
 		Name:     fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", wc.Name, mc.Name),
@@ -219,7 +219,7 @@ func generateWcToMcPrivateEndpointSpec(wc capz.AzureCluster, mc capz.AzureCluste
 					"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
 					mc.Spec.SubscriptionID,
 					mc.Name,
-					fmt.Sprintf("%s-ingress-privatelink", mc.Name)),
+					fmt.Sprintf("%s-gateway-privatelink", mc.Name)),
 			},
 		},
 		ManualApproval: false,

@@ -202,6 +202,8 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		r.removeFinalizer(&workloadAzureCluster)
 	}
 
+	privateLinksScope.SetStatusAnnotation()
+
 	return ctrl.Result{}, nil
 }
 

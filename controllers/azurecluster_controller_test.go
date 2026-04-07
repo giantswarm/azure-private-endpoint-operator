@@ -448,6 +448,9 @@ var _ = Describe("AzureClusterReconciler", func() {
 			// normalize resource before comparison (we don't care about this field here)
 			workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0].PrivateLinkServiceConnections[0].RequestMessage = ""
 			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0]).To(Equal(expectedPrivateEndpointInWc))
+
+			// done: annotation added
+			Expect(workloadAzureCluster.Annotations).To(HaveKeyWithValue(privatelinks.AzurePrivateEndpointOperatorStatusAnnotation, "done"))
 		})
 	})
 

@@ -82,7 +82,3 @@ func (s *Scope) SetPrivateEndpointIPAddressForWcApi(ip net.IP) {
 func (s *Scope) SetPrivateEndpointIPAddressForMcIngress(ip net.IP) {
 	s.SetAnnotation(AzurePrivateEndpointOperatorMcIngressAnnotation, ip.String())
 }
-
-func (s *Scope) SetStatusGS() {
-	s.SetAnnotation(AzurePrivateEndpointOperatorStatusAnnotation, "done")
-}

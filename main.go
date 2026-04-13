@@ -18,7 +18,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"go.uber.org/zap/zapcore"
@@ -61,6 +63,7 @@ func main() {
 		probeAddr                  string
 		managementClusterName      string
 		managementClusterNamespace string
+		azureClusterGates          ConditionSliceVar
 		syncPeriod                 time.Duration
 	)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080",
@@ -74,6 +77,8 @@ func main() {
 		"The name of the management cluster where this operator is running (also MC AzureCluster CR name)")
 	flag.StringVar(&managementClusterNamespace, "management-cluster-namespace", "",
 		"The namespace where the management cluster AzureCluster CR is deployed")
+	flag.Var(&azureClusterGates, "azure-cluster-gates",
+		"Status conditions on the workload AzureCluster CR that must be true before the control plane starts reconciling")
 	flag.DurationVar(&syncPeriod, "sync-period", 5*time.Minute,
 		"The minimum interval at which watched resources are reconciled (e.g. 15m)")
 	opts := zap.Options{
@@ -116,6 +121,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Printf("%#v", azureClusterGates)
+	os.Exit(1)
+
 	mcNamespacedName := types.NamespacedName{
 		Namespace: managementClusterNamespace,
 		Name:      managementClusterName,
@@ -125,11 +133,23 @@ func main() {
 		setupLog.Error(err, "unable to create new AzureClusterReconciler")
 		os.Exit(1)
 	}
-
 	if err = azureClusterReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AzureCluster")
 		os.Exit(1)
 	}
+
+	kubeadmControlPlaneReconciler, err := controllers.NewKubeadmControlPlaneReconciler(mgr.GetClient(), &controllers.KubeadmControlPlaneReconcilerOptions{
+		AzureClusterGates: azureClusterGates,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to create new KubeadmControlPlaneReconciler")
+		os.Exit(1)
+	}
+	if err = kubeadmControlPlaneReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "KubeadmControlPlane")
+		os.Exit(1)
+	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -146,4 +166,27 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+type ConditionSliceVar []capi.ConditionType
+
+func (v ConditionSliceVar) String() string {
+	s := make([]string, len(v))
+	for i := range v {
+		s[i] = string(v[i])
+	}
+	return strings.Join(s, ",")
+}
+
+func (v *ConditionSliceVar) Set(arg string) error {
+	arg = strings.Trim(arg, ",")
+	t := make([]capi.ConditionType, 0)
+	for s := range strings.SplitSeq(arg, ",") {
+		if s == "" {
+			continue
+		}
+		t = append(t, capi.ConditionType(s))
+	}
+	*v = t
+	return nil
 }

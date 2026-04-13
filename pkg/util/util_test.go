@@ -17,8 +17,8 @@ func TestUtilities(t *testing.T) {
 }
 
 var _ = DescribeTable("AreStatusConditionsMet",
-	func(conditions v1beta1.Conditions, types []v1beta1.ConditionType, want []v1beta1.ConditionType) {
-		unmet := AreStatusConditionsMet(conditions, types)
+	func(conditions v1beta1.Conditions, gates []v1beta1.ConditionType, want []v1beta1.ConditionType) {
+		unmet := AreStatusConditionsMet(conditions, gates)
 		Expect(unmet).To(HaveExactElements(want))
 	},
 	Entry("When conditions are met returns no unmet conditions",
@@ -38,6 +38,9 @@ var _ = DescribeTable("AreStatusConditionsMet",
 	),
 	Entry("When no desired condition types are given returns all unmet conditions",
 		conditions(), types("Foo", "Bar"), types("Foo", "Bar"),
+	),
+	Entry("When desired condition types is nil returns nil",
+		conditions("Foo", "True"), nil, nil,
 	),
 )
 

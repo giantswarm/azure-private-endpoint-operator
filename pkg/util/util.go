@@ -29,6 +29,10 @@ func ConvertToStringSlice(pointers []*string) []string {
 // It returns a slice of unmet conditions for reporting.
 // If all conditions are met, the returning slice is empty.
 func AreStatusConditionsMet(conditions v1beta1.Conditions, gates []v1beta1.ConditionType) []v1beta1.ConditionType {
+	if gates == nil {
+		return nil
+	}
+
 	if len(conditions) == 0 {
 		return gates
 	}

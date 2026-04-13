@@ -72,6 +72,11 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 	logger.Info("starting reconciliation")
 	defer logger.Info("finished reconciliation")
 
+	if len(r.azureClusterGates) == 0 {
+		// No gates, so no checks to perform.
+		return
+	}
+
 	kcp := new(v1beta1.KubeadmControlPlane)
 	err = r.client.Get(ctx, req.NamespacedName, kcp)
 	if err != nil {

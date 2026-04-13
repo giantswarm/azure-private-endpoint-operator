@@ -1,5 +1,10 @@
 package util
 
+import (
+	v1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/cluster-api/api/v1beta1"
+)
+
 func ContainsPtr(slice []*string, str string) bool {
 	for _, v := range slice {
 		if v != nil && *v == str {
@@ -17,4 +22,27 @@ func ConvertToStringSlice(pointers []*string) []string {
 		}
 	}
 	return result
+}
+
+// AreStatusConditionsMet asserts that the status of all given conditions is ready.
+// Any condition that is not listed in parameter 'gates' is ignored.
+// It returns a slice of unmet conditions for reporting.
+// If all conditions are met, the returning slice is empty.
+func AreStatusConditionsMet(conditions v1beta1.Conditions, gates []v1beta1.ConditionType) []v1beta1.ConditionType {
+	if len(conditions) == 0 {
+		return gates
+	}
+
+	unmet := make([]v1beta1.ConditionType, 0)
+	for _, t := range gates {
+		for _, c := range conditions {
+			if c.Type == t {
+				if c.Status != v1.ConditionTrue {
+					unmet = append(unmet, t)
+				}
+				break
+			}
+		}
+	}
+	return unmet
 }

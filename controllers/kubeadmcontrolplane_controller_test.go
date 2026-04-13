@@ -1,0 +1,190 @@
+package controllers_test
+
+import (
+	"context"
+
+	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+var _ = Describe("KubeadmControlPlaneReconciler", func() {
+	var scheme *runtime.Scheme
+
+	BeforeEach(func() {
+		scheme = runtime.NewScheme()
+		utilruntime.Must(kcpv1.AddToScheme(scheme))
+		utilruntime.Must(capi.AddToScheme(scheme))
+		utilruntime.Must(capz.AddToScheme(scheme))
+	})
+
+	Describe("creating reconciler", func() {
+		It("creates reconciler", func() {
+			client := fake.NewClientBuilder().Build()
+			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(reconciler).NotTo(BeNil())
+		})
+
+		It("it fails to create a reconciler when the client is nil", func() {
+			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(nil)
+			Expect(err).Should(HaveOccurred())
+			Expect(reconciler).To(BeNil())
+		})
+	})
+
+	Describe("PreflightChecks", func() {
+		// These tests don't rely on internal state.
+		reconciler := new(controllers.KubeadmControlPlaneReconciler)
+		namespace, name := "default", "test"
+
+		Describe("ControlPlane", func() {
+			It("cancels when the control plane is being deleted", func(ctx context.Context) {
+				kcp := testhelpers.NewKubeadmControlPlaneBuilder(namespace, name).
+					WithDeletionTimestamp().
+					Build()
+
+				err := reconciler.PreflightCheckControlPlane(ctx, kcp)
+				Expect(err).To(MatchError(controllers.ErrReasonControlPlaneDeleting))
+			})
+
+			It("cancels when the control plane is already provisioned", func(ctx context.Context) {
+				kcp := testhelpers.NewKubeadmControlPlaneBuilder(namespace, name).
+					WithStatusProvisioned().
+					Build()
+
+				err := reconciler.PreflightCheckControlPlane(ctx, kcp)
+				Expect(err).To(MatchError(controllers.ErrReasonControlPlaneProvisioned))
+			})
+
+			It("cancels when the control plane does not yet have an owning cluster", func(ctx context.Context) {
+				kcp := testhelpers.NewKubeadmControlPlaneBuilder(namespace, name).Build()
+
+				err := reconciler.PreflightCheckControlPlane(ctx, kcp)
+				Expect(err).To(MatchError(controllers.ErrReasonControlPlaneHasNoOwner))
+			})
+
+			It("proceeds when all preflight conditions are met", func(ctx context.Context) {
+				kcp := testhelpers.NewKubeadmControlPlaneBuilder(namespace, name).Build()
+				_ = testhelpers.NewClusterBuilder(scheme).WithControlPlane(kcp).Build()
+
+				err := reconciler.PreflightCheckControlPlane(ctx, kcp)
+				Expect(err).ShouldNot(HaveOccurred())
+			})
+		})
+
+		Describe("Cluster", func() {
+			It("cancels when the cluster is paused", func(ctx context.Context) {
+				cluster := testhelpers.NewClusterBuilder(scheme).WithPause().Build()
+
+				err := reconciler.PreflightCheckCluster(ctx, cluster)
+				Expect(err).To(MatchError(controllers.ErrReasonClusterPaused))
+			})
+
+			It("cancels when the cluster has no infrastructure ref", func(ctx context.Context) {
+				cluster := testhelpers.NewClusterBuilder(scheme).Build()
+
+				err := reconciler.PreflightCheckCluster(ctx, cluster)
+				Expect(err).To(MatchError(controllers.ErrReasonInfraClusterMissing))
+			})
+
+			It("proceeds when all conditions are met", func(ctx context.Context) {
+				azureCluster := testhelpers.NewAzureClusterBuilder("", "").Build()
+				cluster := testhelpers.NewClusterBuilder(scheme).WithAzureCluster(azureCluster).Build()
+
+				err := reconciler.PreflightCheckCluster(ctx, cluster)
+				Expect(err).ShouldNot(HaveOccurred())
+			})
+		})
+	})
+
+	Describe("reconciliation", func() {
+		It("pauses the control plane when conditions are unmet", func(ctx context.Context) {
+			name, namespace := "test", "org-giantswarm"
+			kcp := testhelpers.NewKubeadmControlPlaneBuilder(namespace, name).Build()
+			infraCluster := testhelpers.NewAzureClusterBuilder("", name).Build()
+			cluster := testhelpers.NewClusterBuilder(scheme).
+				WithControlPlane(kcp).
+				WithAzureCluster(infraCluster).
+				Build()
+
+			client := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(kcp, infraCluster, cluster).
+				Build()
+
+			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			request := testhelpers.Request(namespace, name)
+			result, err := reconciler.Reconcile(ctx, request)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(result.Requeue).Should(BeFalse())
+
+			err = client.Get(ctx, request.NamespacedName, kcp)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(kcp.Annotations).To(HaveKey(capi.PausedAnnotation))
+		})
+	})
+})
+
+func kubeadmControlPlaneWithoutOwner(scheme *runtime.Scheme, name, namespace string) *kcpv1.KubeadmControlPlane {
+	kcp := &kcpv1.KubeadmControlPlane{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	gvk, err := apiutil.GVKForObject(kcp, scheme)
+	Expect(err).ShouldNot(HaveOccurred())
+	kcp.SetGroupVersionKind(gvk)
+	return kcp
+}
+
+func kubeadmControlPlaneWithoutInfraCluster(scheme *runtime.Scheme, name, namespace string) (*capi.Cluster, *kcpv1.KubeadmControlPlane) {
+	kcp := kubeadmControlPlaneWithoutOwner(scheme, name, namespace)
+	cluster := &capi.Cluster{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: capi.ClusterSpec{
+			ControlPlaneRef: &corev1.ObjectReference{
+				Kind:      kcp.Kind,
+				Name:      name,
+				Namespace: namespace,
+			},
+		},
+	}
+	gvk, err := apiutil.GVKForObject(cluster, scheme)
+	Expect(err).ShouldNot(HaveOccurred())
+	cluster.SetGroupVersionKind(gvk)
+	err = controllerutil.SetControllerReference(cluster, kcp, scheme)
+	Expect(err).ShouldNot(HaveOccurred())
+	return cluster, kcp
+}
+
+func kubeadmControlPlane(scheme *runtime.Scheme, name, namespace string) (*capi.Cluster, *kcpv1.KubeadmControlPlane, *capz.AzureCluster) {
+	cluster, kcp := kubeadmControlPlaneWithoutInfraCluster(scheme, name, namespace)
+	infraCluster := &capz.AzureCluster{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	gvk, err := apiutil.GVKForObject(infraCluster, scheme)
+	Expect(err).ShouldNot(HaveOccurred())
+	infraCluster.SetGroupVersionKind(gvk)
+	return cluster, kcp, infraCluster
+}

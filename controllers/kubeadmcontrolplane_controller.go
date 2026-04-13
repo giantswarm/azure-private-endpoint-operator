@@ -64,6 +64,8 @@ type KubeadmControlPlaneReconciler struct {
 	azureClusterGates []capi.ConditionType
 }
 
+// Reconcile KubeadmControlPlane to ensure that its associated InfraCluster has passed specific conditions.
+// As long as these conditions are not met, the KubeadmControlPlane is paused.
 func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	logger := log.FromContext(ctx).WithValues("controlplane", req.NamespacedName)
 

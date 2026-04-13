@@ -17,7 +17,6 @@ import (
 const (
 	AzurePrivateEndpointOperatorApiServerAnnotation string = "azure-private-endpoint-operator.giantswarm.io/private-link-apiserver-ip"
 	AzurePrivateEndpointOperatorMcIngressAnnotation string = "azure-private-endpoint-operator.giantswarm.io/private-link-mc-ingress-ip"
-	AzurePrivateEndpointOperatorStatusAnnotation    string = "azure-private-endpoint-operator.giantswarm.io/status"
 )
 
 func NewScope(workloadCluster *capz.AzureCluster, client client.Client) (*Scope, error) {
@@ -84,6 +83,6 @@ func (s *Scope) SetPrivateEndpointIPAddressForMcIngress(ip net.IP) {
 	s.SetAnnotation(AzurePrivateEndpointOperatorMcIngressAnnotation, ip.String())
 }
 
-func (s *Scope) SetStatusAnnotation() {
+func (s *Scope) SetStatusGS() {
 	s.SetAnnotation(AzurePrivateEndpointOperatorStatusAnnotation, "done")
 }

@@ -9,7 +9,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -35,14 +35,24 @@ type ReconcileError struct {
 	Reason string
 }
 
-func NewKubeadmControlPlaneReconciler(client client.Client) (*KubeadmControlPlaneReconciler, error) {
+type KubeadmControlPlaneReconcilerOptions struct {
+	AzureClusterGates []capi.ConditionType
+}
+
+func NewKubeadmControlPlaneReconciler(client client.Client, opts *KubeadmControlPlaneReconcilerOptions) (*KubeadmControlPlaneReconciler, error) {
 	if client == nil {
 		return nil, errors.New("failed to build reconciler: client is nil")
 	}
 
-	return &KubeadmControlPlaneReconciler{
+	r := &KubeadmControlPlaneReconciler{
 		client: client,
-	}, nil
+	}
+
+	if opts != nil {
+		r.azureClusterGates = opts.AzureClusterGates
+	}
+
+	return r, nil
 }
 
 // KubeadmControlPlaneReconciler pauses or unpauses reconciliation of a cluster's KubeadmControlPlaneReconciler
@@ -50,7 +60,8 @@ func NewKubeadmControlPlaneReconciler(client client.Client) (*KubeadmControlPlan
 // until all gates pass. In practice, we use gates to pause CAPI or CAPZ reconcilers until our own reconcilers
 // complete their tasks.
 type KubeadmControlPlaneReconciler struct {
-	client client.Client
+	client            client.Client
+	azureClusterGates []capi.ConditionType
 }
 
 func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
@@ -105,21 +116,21 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 	}
 	defer helper.Patch(ctx, kcp)
 
-	unmet := gsutil.AreStatusConditionsMet(infraCluster.Status.Conditions, []clusterv1.ConditionType{"iDontExist!"})
+	unmet := gsutil.AreStatusConditionsMet(infraCluster.Status.Conditions, r.azureClusterGates)
 	if len(unmet) != 0 {
 		logger.Info("pausing control plane because infrastructure cluster conditions were not met", "conditions", unmet)
 		annotations := kcp.GetAnnotations()
 		if annotations == nil {
 			annotations = make(map[string]string)
 		}
-		annotations[clusterv1.PausedAnnotation] = "true"
+		annotations[capi.PausedAnnotation] = "true"
 		kcp.SetAnnotations(annotations)
 		return
 	}
 
 	logger.Info("unpausing control plane because all infrastructure cluster conditions were met")
 	anns := kcp.GetAnnotations()
-	delete(anns, clusterv1.PausedAnnotation)
+	delete(anns, capi.PausedAnnotation)
 	kcp.SetAnnotations(anns)
 	return
 }
@@ -144,7 +155,7 @@ func (r *KubeadmControlPlaneReconciler) PreflightCheckControlPlane(ctx context.C
 	return nil
 }
 
-func (r *KubeadmControlPlaneReconciler) PreflightCheckCluster(ctx context.Context, cluster *clusterv1.Cluster) error {
+func (r *KubeadmControlPlaneReconciler) PreflightCheckCluster(ctx context.Context, cluster *capi.Cluster) error {
 	// If the Cluster is paused, then we should not, in any circumstance, unpause the control plane.
 	if cluster.Spec.Paused {
 		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonClusterPaused)

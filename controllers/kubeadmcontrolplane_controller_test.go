@@ -32,13 +32,13 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 	Describe("creating reconciler", func() {
 		It("creates reconciler", func() {
 			client := fake.NewClientBuilder().Build()
-			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client)
+			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, nil)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(reconciler).NotTo(BeNil())
 		})
 
 		It("it fails to create a reconciler when the client is nil", func() {
-			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(nil)
+			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(nil, nil)
 			Expect(err).Should(HaveOccurred())
 			Expect(reconciler).To(BeNil())
 		})
@@ -124,7 +124,9 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				WithObjects(kcp, infraCluster, cluster).
 				Build()
 
-			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client)
+			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, &controllers.KubeadmControlPlaneReconcilerOptions{
+				AzureClusterGates: []capi.ConditionType{"NotMet"},
+			})
 			Expect(err).ShouldNot(HaveOccurred())
 
 			request := testhelpers.Request(namespace, name)
@@ -135,6 +137,39 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 			err = client.Get(ctx, request.NamespacedName, kcp)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(kcp.Annotations).To(HaveKey(capi.PausedAnnotation))
+		})
+
+		It("unpauses the control plane when all conditions are met", func(ctx context.Context) {
+			name, namespace := "test", "org-giantswarm"
+			condition := capi.Condition{
+				Type:   "YesMet",
+				Status: corev1.ConditionTrue,
+			}
+			kcp := testhelpers.NewKubeadmControlPlaneBuilder(namespace, name).WithPause().Build()
+			infraCluster := testhelpers.NewAzureClusterBuilder("", name).WithCondition(&condition).Build()
+			cluster := testhelpers.NewClusterBuilder(scheme).
+				WithControlPlane(kcp).
+				WithAzureCluster(infraCluster).
+				Build()
+
+			client := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(kcp, infraCluster, cluster).
+				Build()
+
+			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, &controllers.KubeadmControlPlaneReconcilerOptions{
+				AzureClusterGates: []capi.ConditionType{condition.Type},
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+
+			request := testhelpers.Request(namespace, name)
+			result, err := reconciler.Reconcile(ctx, request)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(result.Requeue).Should(BeFalse())
+
+			err = client.Get(ctx, request.NamespacedName, kcp)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(kcp.Annotations).To(Not(HaveKey(capi.PausedAnnotation)))
 		})
 	})
 })

@@ -146,19 +146,21 @@ func (s *Service) ReconcileMcToWcApi(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) ReconcileWcToMcIngress(ctx context.Context, wcToMcSpec capz.PrivateEndpointSpec) error {
+func (s *Service) ReconcileWcToMcIngress(ctx context.Context, specs []capz.PrivateEndpointSpec) error {
 	logger := log.FromContext(ctx)
 
-	s.privateEndpointsScope.AddPrivateEndpointSpec(wcToMcSpec)
-	logger.Info(fmt.Sprintf("Ensured private endpoint %s is added to %s", wcToMcSpec.Name, s.privateEndpointsScope.GetClusterName()))
+	for _, spec := range specs {
+		s.privateEndpointsScope.AddPrivateEndpointSpec(spec)
+		logger.Info(fmt.Sprintf("Ensured private endpoint %s is added to %s", spec.Name, s.privateEndpointsScope.GetClusterName()))
 
-	privateEndpointIPAddress, err := s.privateEndpointsScope.GetPrivateEndpointIPAddress(ctx, wcToMcSpec.Name)
-	if err != nil {
-		return microerror.Mask(err)
+		ip, err := s.privateEndpointsScope.GetPrivateEndpointIPAddress(ctx, spec.Name)
+		if err != nil {
+			return microerror.Mask(err)
+		}
+		logger.Info("found private endpoint IP address in WC", "name", spec.Name, "ipAddress", ip.String())
+		s.privateLinksScope.SetPrivateEndpointIPAddressForMcIngress(ip)
+		logger.Info("set private endpoint IP address in WC AzureCluster", "name", spec.Name, "ipAddress", ip.String())
 	}
-	logger.Info("found private endpoint IP address in WC for ingress", "ipAddress", privateEndpointIPAddress.String())
-	s.privateLinksScope.SetPrivateEndpointIPAddressForMcIngress(privateEndpointIPAddress)
-	logger.Info("set private endpoint IP address in WC AzureCluster for ingress", "ipAddress", privateEndpointIPAddress.String())
 
 	return nil
 }

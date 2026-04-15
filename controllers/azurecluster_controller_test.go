@@ -25,10 +25,12 @@ import (
 )
 
 const (
-	testPrivateLinkNameForWcAPI       = "super-private-link"
-	testPrivateEndpointIpForWcAPI     = "10.10.10.10"
-	testPrivateLinkNameForMcIngress   = "giant-ingress-privatelink"
-	testPrivateEndpointIpForMcIngress = "10.10.10.11"
+	testPrivateLinkNameForWcAPI        = "super-private-link"
+	testPrivateEndpointIpForWcAPI      = "10.10.10.10"
+	testPrivateLinkNameForMcIngress    = "giant-ingress-privatelink"
+	testPrivateEndpointIpForMcIngress  = "10.10.10.11"
+	testPrivateLinkNameForMcGateway    = "giant-gateway-privatelink"
+	testPrivateEndpointIpForMcGateway  = "10.10.10.12"
 )
 
 var _ = Describe("AzureClusterReconciler", func() {
@@ -386,6 +388,11 @@ var _ = Describe("AzureClusterReconciler", func() {
 						workloadClusterName,
 						fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName),
 						testPrivateEndpointIpForMcIngress)
+					testhelpers.SetupPrivateEndpointClientToReturnPrivateIp(
+						privateEndpointsClient,
+						workloadClusterName,
+						fmt.Sprintf("%s-to-%s-gateway-privateendpoint", workloadClusterName, managementClusterName),
+						testPrivateEndpointIpForMcGateway)
 				}
 				return privateEndpointsClient, nil
 			}
@@ -433,21 +440,29 @@ var _ = Describe("AzureClusterReconciler", func() {
 			Expect(ok).To(BeTrue())
 			Expect(privateEndpointIpForWcApi).To(Equal(testPrivateEndpointIpForWcAPI))
 
+			// The annotation is set by the gateway endpoint (last to run), so it holds the gateway IP.
 			privateEndpointIpForMcIngress, ok := workloadAzureCluster.Annotations[privatelinks.AzurePrivateEndpointOperatorMcIngressAnnotation]
 			Expect(ok).To(BeTrue())
-			Expect(privateEndpointIpForMcIngress).To(Equal(testPrivateEndpointIpForMcIngress))
+			Expect(privateEndpointIpForMcIngress).To(Equal(testPrivateEndpointIpForMcGateway))
 
-			// done: private endpoint has been added to the WC
-			expectedPrivateEndpointInWc := testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName)).
+			// done: both private endpoints have been added to the WC
+			expectedIngressPrivateEndpointInWc := testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName)).
 				WithLocation(location).
 				WithPrivateLinkServiceConnectionWithName(subscriptionID, managementClusterName, testPrivateLinkNameForMcIngress,
 					fmt.Sprintf("%s-to-%s-connection", workloadClusterName, managementClusterName)).
 				Build()
-			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(1))
+			expectedGatewayPrivateEndpointInWc := testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-to-%s-gateway-privateendpoint", workloadClusterName, managementClusterName)).
+				WithLocation(location).
+				WithPrivateLinkServiceConnectionWithName(subscriptionID, managementClusterName, testPrivateLinkNameForMcGateway,
+					fmt.Sprintf("%s-to-%s-gateway-connection", workloadClusterName, managementClusterName)).
+				Build()
+			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(2))
 
-			// normalize resource before comparison (we don't care about this field here)
+			// normalize resources before comparison (we don't care about this field here)
 			workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0].PrivateLinkServiceConnections[0].RequestMessage = ""
-			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0]).To(Equal(expectedPrivateEndpointInWc))
+			workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[1].PrivateLinkServiceConnections[0].RequestMessage = ""
+			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0]).To(Equal(expectedIngressPrivateEndpointInWc))
+			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[1]).To(Equal(expectedGatewayPrivateEndpointInWc))
 		})
 	})
 

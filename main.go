@@ -77,7 +77,7 @@ func main() {
 		"The namespace where the management cluster AzureCluster CR is deployed")
 	flag.DurationVar(&syncPeriod, "sync-period", 5*time.Minute,
 		"The minimum interval at which watched resources are reconciled (e.g. 15m)")
-	flag.StringVar(&mcIngressIPSource, "mc-ingress-ip-source", "gateway",
+	flag.StringVar(&mcIngressIPSource, "mc-ingress-ip-source", "ingress",
 		"Source private endpoint for the MC ingress IP annotation (ingress or gateway)")
 	opts := zap.Options{
 		Development: false,

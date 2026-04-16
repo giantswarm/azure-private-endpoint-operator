@@ -37,4 +37,4 @@ azure:
     clientID: ""
 
 operator:
-  mcIngressIPSource: "gateway"
+  mcIngressIPSource: "ingress"

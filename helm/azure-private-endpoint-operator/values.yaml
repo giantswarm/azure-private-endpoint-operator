@@ -35,3 +35,6 @@ managementCluster:
 azure:
   workloadIdentity:
     clientID: ""
+
+operator:
+  mcIngressIPSource: "gateway"

@@ -16,6 +16,11 @@ import (
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
 )
 
+const (
+	McIngressIPSourceIngress = "ingress"
+	McIngressIPSourceGateway = "gateway"
+)
+
 // PrivateLinksScope is the interface for getting private links for which the private endpoints are needed.
 type PrivateLinksScope interface {
 	GetClusterName() types.NamespacedName
@@ -26,6 +31,7 @@ type PrivateLinksScope interface {
 	LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLink, bool)
 	PatchObject(ctx context.Context) error
 	PrivateLinksReady() bool
+	IsMcIngressEndpoint(name string) bool
 	SetPrivateEndpointIPAddressForWcApi(ip net.IP)
 	SetPrivateEndpointIPAddressForMcIngress(ip net.IP)
 	Close(ctx context.Context) error
@@ -158,8 +164,11 @@ func (s *Service) ReconcileWcToMcIngress(ctx context.Context, specs []capz.Priva
 			return microerror.Mask(err)
 		}
 		logger.Info("found private endpoint IP address in WC", "name", spec.Name, "ipAddress", ip.String())
-		s.privateLinksScope.SetPrivateEndpointIPAddressForMcIngress(ip)
-		logger.Info("set private endpoint IP address in WC AzureCluster", "name", spec.Name, "ipAddress", ip.String())
+
+		if s.privateLinksScope.IsMcIngressEndpoint(spec.Name) {
+			s.privateLinksScope.SetPrivateEndpointIPAddressForMcIngress(ip)
+			logger.Info("set private endpoint IP address in WC AzureCluster", "name", spec.Name, "ipAddress", ip.String())
+		}
 	}
 
 	return nil

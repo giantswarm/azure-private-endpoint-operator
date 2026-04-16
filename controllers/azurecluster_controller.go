@@ -41,14 +41,20 @@ const (
 	AzureClusterControllerFinalizer string = "azure-private-endpoint-operator.giantswarm.io/azurecluster"
 )
 
+// Options holds optional configuration for AzureClusterReconciler.
+type Options struct {
+	McIngressIPSource string
+}
+
 // AzureClusterReconciler reconciles a AzureCluster object
 type AzureClusterReconciler struct {
 	client.Client
 	privateEndpointsClientCreator azure.PrivateEndpointsClientCreator
 	managementClusterName         types.NamespacedName
+	options                       Options
 }
 
-func NewAzureClusterReconciler(client client.Client, privateEndpointsClientCreator azure.PrivateEndpointsClientCreator, managementClusterName types.NamespacedName) (*AzureClusterReconciler, error) {
+func NewAzureClusterReconciler(client client.Client, privateEndpointsClientCreator azure.PrivateEndpointsClientCreator, managementClusterName types.NamespacedName, options Options) (*AzureClusterReconciler, error) {
 	if client == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "client must be set")
 	}
@@ -61,11 +67,15 @@ func NewAzureClusterReconciler(client client.Client, privateEndpointsClientCreat
 	if managementClusterName.Namespace == "" {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "%T.Namespace must be set", managementClusterName)
 	}
+	if options.McIngressIPSource != privateendpoints.McIngressIPSourceIngress && options.McIngressIPSource != privateendpoints.McIngressIPSourceGateway {
+		return nil, microerror.Maskf(errors.InvalidConfigError, "options.McIngressIPSource must be %q or %q, got %q", privateendpoints.McIngressIPSourceIngress, privateendpoints.McIngressIPSourceGateway, options.McIngressIPSource)
+	}
 
 	return &AzureClusterReconciler{
 		Client:                        client,
 		privateEndpointsClientCreator: privateEndpointsClientCreator,
 		managementClusterName:         managementClusterName,
+		options:                       options,
 	}, nil
 }
 
@@ -114,7 +124,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Create WC private links scope - we use this to get the info about the private workload
 	// cluster private links, and then we make sure to have a private endpoints that connect to the
 	// private links.
-	privateLinksScope, err := privatelinks.NewScope(&workloadAzureCluster, r.Client)
+	privateLinksScope, err := privatelinks.NewScope(&workloadAzureCluster, r.Client, r.options.McIngressIPSource)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}

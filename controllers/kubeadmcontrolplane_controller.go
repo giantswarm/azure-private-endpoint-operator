@@ -135,10 +135,12 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 		return
 	}
 
-	logger.Info("unpausing control plane because all infrastructure cluster conditions were met")
-	anns := kcp.GetAnnotations()
-	delete(anns, capi.PausedAnnotation)
-	kcp.SetAnnotations(anns)
+	annotations := kcp.GetAnnotations()
+	if _, ok := annotations[capi.PausedAnnotation]; ok {
+		logger.Info("unpausing control plane because all infrastructure cluster conditions were met")
+		delete(annotations, capi.PausedAnnotation)
+		kcp.SetAnnotations(annotations)
+	}
 	return
 }
 

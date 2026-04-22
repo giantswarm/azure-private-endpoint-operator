@@ -20,6 +20,7 @@ import (
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure/mock_azure"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privateendpoints"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privatelinks"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 )
@@ -83,7 +84,9 @@ var _ = Describe("AzureClusterReconciler", func() {
 		if workloadAzureCluster != nil {
 			objects = append(objects, workloadAzureCluster)
 		}
-		k8sClientBuilder := fake.NewClientBuilder().WithScheme(capzSchema)
+		k8sClientBuilder := fake.NewClientBuilder().
+			WithScheme(capzSchema).
+			WithStatusSubresource(&capz.AzureCluster{})
 		if len(objects) > 0 {
 			k8sClientBuilder.WithObjects(objects...)
 		}
@@ -444,6 +447,9 @@ var _ = Describe("AzureClusterReconciler", func() {
 					fmt.Sprintf("%s-to-%s-connection", workloadClusterName, managementClusterName)).
 				Build()
 			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(1))
+
+			// done: status condition has been added to the WC
+			Expect(workloadAzureCluster.GetConditions()).To(testhelpers.MeetConditions(privateendpoints.ConditionGSPrivateLinksReady))
 
 			// normalize resource before comparison (we don't care about this field here)
 			workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0].PrivateLinkServiceConnections[0].RequestMessage = ""

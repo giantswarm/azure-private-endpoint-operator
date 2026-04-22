@@ -8,8 +8,8 @@ import (
 	"sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
-// MeetStatusConditions is a Gomega matcher that wraps around [util.AreStatusConditionsMet].
-func MeetStatusConditions(gates ...v1beta1.ConditionType) types.GomegaMatcher {
+// MeetConditions is a Gomega matcher that wraps around [util.AreStatusConditionsMet].
+func MeetConditions(gates ...v1beta1.ConditionType) types.GomegaMatcher {
 	return &matchStatusCondition{gates: gates}
 }
 

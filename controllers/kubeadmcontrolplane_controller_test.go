@@ -5,6 +5,7 @@ import (
 
 	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
+	. "github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -29,7 +30,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 		utilruntime.Must(capz.AddToScheme(scheme))
 	})
 
-	Describe("creating reconciler", func() {
+	Describe("Constructor", func() {
 		It("creates reconciler", func() {
 			client := fake.NewClientBuilder().Build()
 			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, nil)
@@ -109,12 +110,12 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 		})
 	})
 
-	Describe("reconciliation", func() {
+	Describe("Reconciliation", func() {
 		It("pauses the control plane when conditions are unmet", func(ctx context.Context) {
 			name, namespace := "test", "org-giantswarm"
-			kcp := testhelpers.NewKubeadmControlPlaneBuilder(namespace, name).Build()
-			infraCluster := testhelpers.NewAzureClusterBuilder("", name).Build()
-			cluster := testhelpers.NewClusterBuilder(scheme).
+			kcp := NewKubeadmControlPlaneBuilder(namespace, name).Build()
+			infraCluster := NewAzureClusterBuilder("", name).Build()
+			cluster := NewClusterBuilder(scheme).
 				WithControlPlane(kcp).
 				WithAzureCluster(infraCluster).
 				Build()
@@ -129,7 +130,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 			})
 			Expect(err).ShouldNot(HaveOccurred())
 
-			request := testhelpers.Request(namespace, name)
+			request := Request(namespace, name)
 			result, err := reconciler.Reconcile(ctx, request)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(result.Requeue).Should(BeFalse())
@@ -145,9 +146,9 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				Type:   "YesMet",
 				Status: corev1.ConditionTrue,
 			}
-			kcp := testhelpers.NewKubeadmControlPlaneBuilder(namespace, name).WithPause().Build()
-			infraCluster := testhelpers.NewAzureClusterBuilder("", name).WithCondition(&condition).Build()
-			cluster := testhelpers.NewClusterBuilder(scheme).
+			kcp := NewKubeadmControlPlaneBuilder(namespace, name).WithPause().Build()
+			infraCluster := NewAzureClusterBuilder("", name).WithCondition(&condition).Build()
+			cluster := NewClusterBuilder(scheme).
 				WithControlPlane(kcp).
 				WithAzureCluster(infraCluster).
 				Build()
@@ -162,7 +163,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 			})
 			Expect(err).ShouldNot(HaveOccurred())
 
-			request := testhelpers.Request(namespace, name)
+			request := Request(namespace, name)
 			result, err := reconciler.Reconcile(ctx, request)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(result.Requeue).Should(BeFalse())

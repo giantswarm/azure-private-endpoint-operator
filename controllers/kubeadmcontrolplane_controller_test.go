@@ -14,7 +14,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
-	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 	. "github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 )
 
@@ -50,7 +49,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 
 		Describe("ControlPlane", func() {
 			It("cancels when the control plane is being deleted", func(ctx context.Context) {
-				kcp := testhelpers.NewKubeadmControlPlaneBuilder(namespace, name).
+				kcp := NewKubeadmControlPlaneBuilder(namespace, name).
 					WithDeletionTimestamp().
 					Build()
 
@@ -59,7 +58,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 			})
 
 			It("cancels when the control plane is already provisioned", func(ctx context.Context) {
-				kcp := testhelpers.NewKubeadmControlPlaneBuilder(namespace, name).
+				kcp := NewKubeadmControlPlaneBuilder(namespace, name).
 					WithStatusProvisioned().
 					Build()
 
@@ -68,15 +67,15 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 			})
 
 			It("cancels when the control plane does not yet have an owning cluster", func(ctx context.Context) {
-				kcp := testhelpers.NewKubeadmControlPlaneBuilder(namespace, name).Build()
+				kcp := NewKubeadmControlPlaneBuilder(namespace, name).Build()
 
 				err := reconciler.PreflightCheckControlPlane(ctx, kcp)
 				Expect(err).To(MatchError(controllers.ErrReasonControlPlaneHasNoOwner))
 			})
 
 			It("proceeds when all preflight conditions are met", func(ctx context.Context) {
-				kcp := testhelpers.NewKubeadmControlPlaneBuilder(namespace, name).Build()
-				_ = testhelpers.NewClusterBuilder(scheme).WithControlPlane(kcp).Build()
+				kcp := NewKubeadmControlPlaneBuilder(namespace, name).Build()
+				_ = NewClusterBuilder(scheme).WithControlPlane(kcp).Build()
 
 				err := reconciler.PreflightCheckControlPlane(ctx, kcp)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -85,22 +84,22 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 
 		Describe("Cluster", func() {
 			It("cancels when the cluster is paused", func(ctx context.Context) {
-				cluster := testhelpers.NewClusterBuilder(scheme).WithPause().Build()
+				cluster := NewClusterBuilder(scheme).WithPause().Build()
 
 				err := reconciler.PreflightCheckCluster(ctx, cluster)
 				Expect(err).To(MatchError(controllers.ErrReasonClusterPaused))
 			})
 
 			It("cancels when the cluster has no infrastructure ref", func(ctx context.Context) {
-				cluster := testhelpers.NewClusterBuilder(scheme).Build()
+				cluster := NewClusterBuilder(scheme).Build()
 
 				err := reconciler.PreflightCheckCluster(ctx, cluster)
 				Expect(err).To(MatchError(controllers.ErrReasonInfraClusterMissing))
 			})
 
 			It("proceeds when all conditions are met", func(ctx context.Context) {
-				azureCluster := testhelpers.NewAzureClusterBuilder("", "").Build()
-				cluster := testhelpers.NewClusterBuilder(scheme).WithAzureCluster(azureCluster).Build()
+				azureCluster := NewAzureClusterBuilder("", "").Build()
+				cluster := NewClusterBuilder(scheme).WithAzureCluster(azureCluster).Build()
 
 				err := reconciler.PreflightCheckCluster(ctx, cluster)
 				Expect(err).ShouldNot(HaveOccurred())

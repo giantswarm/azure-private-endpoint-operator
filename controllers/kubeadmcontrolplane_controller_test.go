@@ -6,15 +6,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
@@ -175,53 +172,3 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 		})
 	})
 })
-
-func kubeadmControlPlaneWithoutOwner(scheme *runtime.Scheme, name, namespace string) *kcpv1.KubeadmControlPlane {
-	kcp := &kcpv1.KubeadmControlPlane{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-	}
-	gvk, err := apiutil.GVKForObject(kcp, scheme)
-	Expect(err).ShouldNot(HaveOccurred())
-	kcp.SetGroupVersionKind(gvk)
-	return kcp
-}
-
-func kubeadmControlPlaneWithoutInfraCluster(scheme *runtime.Scheme, name, namespace string) (*capi.Cluster, *kcpv1.KubeadmControlPlane) {
-	kcp := kubeadmControlPlaneWithoutOwner(scheme, name, namespace)
-	cluster := &capi.Cluster{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec: capi.ClusterSpec{
-			ControlPlaneRef: &corev1.ObjectReference{
-				Kind:      kcp.Kind,
-				Name:      name,
-				Namespace: namespace,
-			},
-		},
-	}
-	gvk, err := apiutil.GVKForObject(cluster, scheme)
-	Expect(err).ShouldNot(HaveOccurred())
-	cluster.SetGroupVersionKind(gvk)
-	err = controllerutil.SetControllerReference(cluster, kcp, scheme)
-	Expect(err).ShouldNot(HaveOccurred())
-	return cluster, kcp
-}
-
-func kubeadmControlPlane(scheme *runtime.Scheme, name, namespace string) (*capi.Cluster, *kcpv1.KubeadmControlPlane, *capz.AzureCluster) {
-	cluster, kcp := kubeadmControlPlaneWithoutInfraCluster(scheme, name, namespace)
-	infraCluster := &capz.AzureCluster{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-	}
-	gvk, err := apiutil.GVKForObject(infraCluster, scheme)
-	Expect(err).ShouldNot(HaveOccurred())
-	infraCluster.SetGroupVersionKind(gvk)
-	return cluster, kcp, infraCluster
-}

@@ -3,9 +3,10 @@ package testhelpers
 import (
 	"fmt"
 
-	"github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
 	"github.com/onsi/gomega/types"
 	"sigs.k8s.io/cluster-api/api/v1beta1"
+
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
 )
 
 // MeetConditions is a Gomega matcher that wraps around [util.AreStatusConditionsMet].

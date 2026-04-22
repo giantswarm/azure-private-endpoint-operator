@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	gsutil "github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
@@ -19,6 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	gsutil "github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
 )
 
 var (

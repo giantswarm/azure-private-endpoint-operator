@@ -3,9 +3,6 @@ package controllers_test
 import (
 	"context"
 
-	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
-	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
-	. "github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -18,6 +15,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
+	. "github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 )
 
 var _ = Describe("KubeadmControlPlaneReconciler", func() {

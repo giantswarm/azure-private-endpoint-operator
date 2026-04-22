@@ -39,13 +39,18 @@ func AreStatusConditionsMet(conditions v1beta1.Conditions, gates []v1beta1.Condi
 
 	unmet := make([]v1beta1.ConditionType, 0)
 	for _, t := range gates {
+		found := false
 		for _, c := range conditions {
 			if c.Type == t {
+				found = true
 				if c.Status != v1.ConditionTrue {
 					unmet = append(unmet, t)
 				}
 				break
 			}
+		}
+		if !found {
+			unmet = append(unmet, t)
 		}
 	}
 	return unmet

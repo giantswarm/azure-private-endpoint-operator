@@ -18,7 +18,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -120,9 +119,6 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
-
-	fmt.Printf("%#v", azureClusterGates)
-	os.Exit(1)
 
 	mcNamespacedName := types.NamespacedName{
 		Namespace: managementClusterNamespace,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -13,10 +14,13 @@ import (
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	gsutil "github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
@@ -216,33 +220,49 @@ func (r *KubeadmControlPlaneReconciler) PreflightCheckCluster(ctx context.Contex
 }
 
 func (r *KubeadmControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	azureClusterConditionsChanged := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			old, ok := e.ObjectOld.(*capz.AzureCluster)
+			if !ok {
+				return false
+			}
+			new, ok := e.ObjectNew.(*capz.AzureCluster)
+			if !ok {
+				return false
+			}
+			return !reflect.DeepEqual(old.Status.Conditions, new.Status.Conditions)
+		},
+		CreateFunc:  func(e event.CreateEvent) bool { return false },
+		DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+		GenericFunc: func(e event.GenericEvent) bool { return false },
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1beta1.KubeadmControlPlane{}).
 		Watches(&capz.AzureCluster{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, ac client.Object) []reconcile.Request {
 			logger := mgr.GetLogger()
 
-			infraClusters := new(capz.AzureClusterList)
-			if err := mgr.GetClient().List(ctx, infraClusters); err != nil {
-				logger.Error(err, "while listing AzureClusters")
+			azureCluster, ok := ac.(*capz.AzureCluster)
+			if !ok {
 				return nil
 			}
 
-			reqs := make([]ctrl.Request, 0, len(infraClusters.Items))
-			for _, item := range infraClusters.Items {
-				cluster, err := util.GetOwnerCluster(ctx, mgr.GetClient(), item.ObjectMeta)
-				if err != nil {
-					logger.Error(err, "while getting owning cluster", "infracluster", item.Name)
-				}
-
-				reqs = append(reqs, ctrl.Request{
-					NamespacedName: types.NamespacedName{
-						Namespace: cluster.Namespace,
-						Name:      cluster.Spec.ControlPlaneRef.Name,
-					},
-				})
+			cluster, err := util.GetOwnerCluster(ctx, mgr.GetClient(), azureCluster.ObjectMeta)
+			if err != nil {
+				logger.Error(err, "while getting owning cluster", "infracluster", azureCluster.Name)
+				return nil
 			}
 
-			return nil
-		})).
+			if cluster.Spec.ControlPlaneRef == nil {
+				return nil
+			}
+
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Namespace: cluster.Namespace,
+					Name:      cluster.Spec.ControlPlaneRef.Name,
+				},
+			}}
+		}), builder.WithPredicates(azureClusterConditionsChanged)).
 		Complete(r)
 }

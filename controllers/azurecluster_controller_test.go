@@ -441,7 +441,6 @@ var _ = Describe("AzureClusterReconciler", func() {
 			Expect(ok).To(BeTrue())
 			Expect(privateEndpointIpForWcApi).To(Equal(testPrivateEndpointIpForWcAPI))
 
-			// The annotation is set by the gateway endpoint (last to run), so it holds the gateway IP.
 			privateEndpointIpForMcIngress, ok := workloadAzureCluster.Annotations[privatelinks.AzurePrivateEndpointOperatorMcIngressAnnotation]
 			Expect(ok).To(BeTrue())
 			Expect(privateEndpointIpForMcIngress).To(Equal(testPrivateEndpointIpForMcGateway))

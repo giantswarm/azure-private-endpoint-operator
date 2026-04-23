@@ -11,7 +11,7 @@ import (
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util"
+	caputil "sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	gsutil "github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
 )
 
 var (
@@ -36,10 +36,6 @@ var (
 	ErrReasonClusterPaused               = errors.New("owning cluster is paused")
 	ErrReasonInfraClusterMissing         = errors.New("owning cluster has no infrastructure ref")
 )
-
-type ReconcileError struct {
-	Reason string
-}
 
 type KubeadmControlPlaneReconcilerOptions struct {
 	AzureClusterGates []capi.ConditionType
@@ -70,28 +66,28 @@ func NewKubeadmControlPlaneReconciler(client client.Client, managmentCluster typ
 	return r, nil
 }
 
-// KubeadmControlPlaneReconciler pauses or unpauses reconciliation of a cluster's KubeadmControlPlaneReconciler
-// based on a number of gates. A new KubeadmControlPlane will be automatically paused, and will remain so
-// until all gates pass. In practice, we use gates to pause CAPI or CAPZ reconcilers until our own reconcilers
-// complete their tasks.
+// KubeadmControlPlaneReconciler pauses or unpauses reconciliation of a cluster's KubeadmControlPlane
+// based on the status conditions of its AzureCluster. A new KubeadmControlPlane will be automatically
+// paused, and will remain so until all status conditions pass.
 type KubeadmControlPlaneReconciler struct {
 	client            client.Client
 	managementCluster types.NamespacedName
 	azureClusterGates []capi.ConditionType
 }
 
-// Reconcile KubeadmControlPlane to ensure that its associated InfraCluster has passed specific conditions.
-// As long as these conditions are not met, the KubeadmControlPlane is paused.
+// Reconcile KubeadmControlPlane to ensure that its associated InfraCluster has passed
+// specific status conditions. As long as these conditions are not met, the KubeadmControlPlane
+// is paused.
 func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
-	logger := log.FromContext(ctx).WithValues("controlplane", req.NamespacedName)
-
-	logger.Info("starting reconciliation")
-	defer logger.Info("finished reconciliation")
-
 	if len(r.azureClusterGates) == 0 {
 		// No gates, so no checks to perform.
 		return
 	}
+
+	logger := log.FromContext(ctx).WithValues("controlplane", req.NamespacedName)
+
+	logger.Info("starting reconciliation")
+	defer logger.Info("finished reconciliation")
 
 	managementCluster := new(capz.AzureCluster)
 	err = r.client.Get(ctx, r.managementCluster, managementCluster)
@@ -129,7 +125,7 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 		return
 	}
 
-	cluster, err := util.GetOwnerCluster(ctx, r.client, kcp.ObjectMeta)
+	cluster, err := caputil.GetOwnerCluster(ctx, r.client, kcp.ObjectMeta)
 	if err != nil {
 		return
 	}
@@ -157,7 +153,7 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 	}
 	defer helper.Patch(ctx, kcp)
 
-	unmet := gsutil.AreStatusConditionsMet(infraCluster.Status.Conditions, r.azureClusterGates)
+	unmet := util.AreStatusConditionsMet(infraCluster.Status.Conditions, r.azureClusterGates)
 	if len(unmet) != 0 {
 		logger.Info("pausing control plane because infrastructure cluster conditions were not met", "conditions", unmet)
 		annotations := kcp.GetAnnotations()
@@ -247,7 +243,7 @@ func (r *KubeadmControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error
 				return nil
 			}
 
-			cluster, err := util.GetOwnerCluster(ctx, mgr.GetClient(), azureCluster.ObjectMeta)
+			cluster, err := caputil.GetOwnerCluster(ctx, mgr.GetClient(), azureCluster.ObjectMeta)
 			if err != nil {
 				logger.Error(err, "while getting owning cluster", "infracluster", azureCluster.Name)
 				return nil

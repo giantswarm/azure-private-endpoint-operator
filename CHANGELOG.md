@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add gateway private endpoint (`<wc>-to-<mc>-gateway-privateendpoint`) connecting to `<mc>-gateway-privatelink` alongside the existing ingress private endpoint in each workload cluster.
-- Add `--mc-ingress-ip-source` flag (`ingress` or `gateway`, default `ingress`) to control which private endpoint's IP is written to the `azure-private-endpoint-operator.giantswarm.io/private-link-mc-ingress-ip` annotation on the WC `AzureCluster` CR.
-- Expose `operator.mcIngressIPSource` Helm value (default `ingress`) to configure the flag.
+- Support migration to Gateway API
+  - Add gateway private endpoint (`<wc>-to-<mc>-gateway-privateendpoint`) connecting to `<mc>-gateway-privatelink` alongside the existing ingress private endpoint in each workload cluster.
+  - Add `--mc-ingress-ip-source` flag (`ingress` or `gateway`, default `ingress`) to control which private endpoint's IP is written to the `azure-private-endpoint-operator.giantswarm.io/private-link-mc-ingress-ip` annotation on the WC `AzureCluster` CR.
+  - Expose `operator.mcIngressIPSource` Helm value (default `ingress`) to configure the flag.
 
 ### Removed
 

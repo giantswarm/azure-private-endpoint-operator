@@ -105,13 +105,31 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 			})
 		})
+
+		Describe("AzureCluster", func() {
+			It("cancels when the AzureCluster is not private", func(ctx context.Context) {
+				azureCluster := NewAzureClusterBuilder("", "").WithAPILoadBalancerType(capz.Public).Build()
+
+				err := reconciler.PreflightCheckAzureCluster(ctx, azureCluster)
+				Expect(err).To(MatchError(controllers.ErrReasonInfraClusterNotPrivate))
+			})
+
+			It("proceeds when all conditions are met", func(ctx context.Context) {
+				azureCluster := NewAzureClusterBuilder("", "").WithAPILoadBalancerType(capz.Internal).Build()
+
+				err := reconciler.PreflightCheckAzureCluster(ctx, azureCluster)
+				Expect(err).ShouldNot(HaveOccurred())
+			})
+		})
 	})
 
 	Describe("Reconciliation", func() {
 		It("pauses the control plane when conditions are unmet", func(ctx context.Context) {
 			name, namespace := "test", "org-giantswarm"
 			kcp := NewKubeadmControlPlaneBuilder(namespace, name).Build()
-			infraCluster := NewAzureClusterBuilder("", name).Build()
+			infraCluster := NewAzureClusterBuilder("", name).
+				WithAPILoadBalancerType(capz.Internal).
+				Build()
 			cluster := NewClusterBuilder(scheme).
 				WithControlPlane(kcp).
 				WithAzureCluster(infraCluster).
@@ -144,7 +162,10 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				Status: corev1.ConditionTrue,
 			}
 			kcp := NewKubeadmControlPlaneBuilder(namespace, name).WithPause().Build()
-			infraCluster := NewAzureClusterBuilder("", name).WithCondition(&condition).Build()
+			infraCluster := NewAzureClusterBuilder("", name).
+				WithAPILoadBalancerType(capz.Internal).
+				WithCondition(&condition).
+				Build()
 			cluster := NewClusterBuilder(scheme).
 				WithControlPlane(kcp).
 				WithAzureCluster(infraCluster).

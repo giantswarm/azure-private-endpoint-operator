@@ -30,6 +30,7 @@ var (
 	ErrReasonControlPlaneHasNoOwner  = errors.New("control plane does not yet have an owner")
 	ErrReasonClusterPaused           = errors.New("owning cluster is paused")
 	ErrReasonInfraClusterMissing     = errors.New("owning cluster has no infrastructure ref")
+	ErrReasonInfraClusterNotPrivate  = errors.New("infrastructure cluster is not private")
 )
 
 type ReconcileError struct {
@@ -118,6 +119,14 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 		return
 	}
 
+	if err = r.PreflightCheckAzureCluster(ctx, infraCluster); err != nil {
+		if errors.Is(err, ErrReconcileCancelled) {
+			logger.Info(err.Error())
+			return result, nil
+		}
+		return
+	}
+
 	helper, err := patch.NewHelper(kcp, r.client)
 	if err != nil {
 		return result, err
@@ -173,6 +182,14 @@ func (r *KubeadmControlPlaneReconciler) PreflightCheckCluster(ctx context.Contex
 
 	if cluster.Spec.InfrastructureRef == nil {
 		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonInfraClusterMissing)
+	}
+
+	return nil
+}
+
+func (r *KubeadmControlPlaneReconciler) PreflightCheckAzureCluster(ctx context.Context, azureCluster *capz.AzureCluster) error {
+	if azureCluster.Spec.NetworkSpec.APIServerLB.Type != capz.Internal {
+		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonInfraClusterNotPrivate)
 	}
 
 	return nil

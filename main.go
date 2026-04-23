@@ -135,7 +135,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	kubeadmControlPlaneReconciler, err := controllers.NewKubeadmControlPlaneReconciler(mgr.GetClient(), &controllers.KubeadmControlPlaneReconcilerOptions{
+	kubeadmControlPlaneReconciler, err := controllers.NewKubeadmControlPlaneReconciler(mgr.GetClient(), mcNamespacedName, &controllers.KubeadmControlPlaneReconcilerOptions{
 		AzureClusterGates: azureClusterGates,
 	})
 	if err != nil {

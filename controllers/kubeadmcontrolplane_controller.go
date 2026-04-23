@@ -23,14 +23,14 @@ import (
 )
 
 var (
-	ErrReconcileCancelled            = errors.New("reconciliation cancelled")
-	ErrReasonControlPlaneDeleted     = errors.New("control plane has been deleted")
-	ErrReasonControlPlaneDeleting    = errors.New("control plane is being deleted")
-	ErrReasonControlPlaneProvisioned = errors.New("control plane is provisioned")
-	ErrReasonControlPlaneHasNoOwner  = errors.New("control plane does not yet have an owner")
-	ErrReasonClusterPaused           = errors.New("owning cluster is paused")
-	ErrReasonInfraClusterMissing     = errors.New("owning cluster has no infrastructure ref")
-	ErrReasonInfraClusterNotPrivate  = errors.New("infrastructure cluster is not private")
+	ErrReconcileCancelled                = errors.New("reconciliation cancelled")
+	ErrReasonManagementClusterNotPrivate = errors.New("management cluster is not private")
+	ErrReasonControlPlaneDeleted         = errors.New("control plane has been deleted")
+	ErrReasonControlPlaneDeleting        = errors.New("control plane is being deleted")
+	ErrReasonControlPlaneProvisioned     = errors.New("control plane is provisioned")
+	ErrReasonControlPlaneHasNoOwner      = errors.New("control plane does not yet have an owner")
+	ErrReasonClusterPaused               = errors.New("owning cluster is paused")
+	ErrReasonInfraClusterMissing         = errors.New("owning cluster has no infrastructure ref")
 )
 
 type ReconcileError struct {
@@ -41,13 +41,22 @@ type KubeadmControlPlaneReconcilerOptions struct {
 	AzureClusterGates []capi.ConditionType
 }
 
-func NewKubeadmControlPlaneReconciler(client client.Client, opts *KubeadmControlPlaneReconcilerOptions) (*KubeadmControlPlaneReconciler, error) {
+func NewKubeadmControlPlaneReconciler(client client.Client, managmentCluster types.NamespacedName, opts *KubeadmControlPlaneReconcilerOptions) (*KubeadmControlPlaneReconciler, error) {
 	if client == nil {
 		return nil, errors.New("failed to build reconciler: client is nil")
 	}
 
+	if managmentCluster.Name == "" {
+		return nil, errors.New("management cluster name must be set")
+	}
+
+	if managmentCluster.Namespace == "" {
+		return nil, errors.New("management cluster namespace must be set")
+	}
+
 	r := &KubeadmControlPlaneReconciler{
-		client: client,
+		client:            client,
+		managementCluster: managmentCluster,
 	}
 
 	if opts != nil {
@@ -63,6 +72,7 @@ func NewKubeadmControlPlaneReconciler(client client.Client, opts *KubeadmControl
 // complete their tasks.
 type KubeadmControlPlaneReconciler struct {
 	client            client.Client
+	managementCluster types.NamespacedName
 	azureClusterGates []capi.ConditionType
 }
 
@@ -76,6 +86,24 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	if len(r.azureClusterGates) == 0 {
 		// No gates, so no checks to perform.
+		return
+	}
+
+	managementCluster := new(capz.AzureCluster)
+	err = r.client.Get(ctx, r.managementCluster, managementCluster)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("management cluster has been deleted")
+			return result, nil
+		}
+		return
+	}
+
+	if err = r.PreflightCheckManagementCluster(ctx, managementCluster); err != nil {
+		if errors.Is(err, ErrReconcileCancelled) {
+			logger.Info(err.Error())
+			return result, nil
+		}
 		return
 	}
 
@@ -119,14 +147,6 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 		return
 	}
 
-	if err = r.PreflightCheckAzureCluster(ctx, infraCluster); err != nil {
-		if errors.Is(err, ErrReconcileCancelled) {
-			logger.Info(err.Error())
-			return result, nil
-		}
-		return
-	}
-
 	helper, err := patch.NewHelper(kcp, r.client)
 	if err != nil {
 		return result, err
@@ -152,6 +172,14 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 		kcp.SetAnnotations(annotations)
 	}
 	return
+}
+
+func (r *KubeadmControlPlaneReconciler) PreflightCheckManagementCluster(ctx context.Context, azureCluster *capz.AzureCluster) error {
+	if azureCluster.Spec.NetworkSpec.APIServerLB.Type != capz.Internal {
+		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonManagementClusterNotPrivate)
+	}
+
+	return nil
 }
 
 // PreflightCheckControlPlane asserts that it is safe to proceed reconciling the KubeamControlPlane.
@@ -187,14 +215,6 @@ func (r *KubeadmControlPlaneReconciler) PreflightCheckCluster(ctx context.Contex
 	return nil
 }
 
-func (r *KubeadmControlPlaneReconciler) PreflightCheckAzureCluster(ctx context.Context, azureCluster *capz.AzureCluster) error {
-	if azureCluster.Spec.NetworkSpec.APIServerLB.Type != capz.Internal {
-		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonInfraClusterNotPrivate)
-	}
-
-	return nil
-}
-
 func (r *KubeadmControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1beta1.KubeadmControlPlane{}).
@@ -216,7 +236,7 @@ func (r *KubeadmControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error
 
 				reqs = append(reqs, ctrl.Request{
 					NamespacedName: types.NamespacedName{
-						Namespace: cluster.Spec.ControlPlaneRef.Namespace,
+						Namespace: cluster.Namespace,
 						Name:      cluster.Spec.ControlPlaneRef.Name,
 					},
 				})

@@ -7,10 +7,12 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
@@ -28,15 +30,37 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 	})
 
 	Describe("Constructor", func() {
+		var client client.WithWatch
+		var mcName types.NamespacedName
+
+		BeforeEach(func() {
+			client = fake.NewClientBuilder().Build()
+			mcName = types.NamespacedName{Namespace: "foo", Name: "bar"}
+		})
+
 		It("creates reconciler", func() {
-			client := fake.NewClientBuilder().Build()
-			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, nil)
+			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, mcName, nil)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(reconciler).NotTo(BeNil())
 		})
 
 		It("it fails to create a reconciler when the client is nil", func() {
-			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(nil, nil)
+			client = nil
+			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, mcName, nil)
+			Expect(err).Should(HaveOccurred())
+			Expect(reconciler).To(BeNil())
+		})
+
+		It("fails to create reconciler when MC name is empty", func(ctx context.Context) {
+			mcName.Name = ""
+			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, mcName, nil)
+			Expect(err).Should(HaveOccurred())
+			Expect(reconciler).To(BeNil())
+		})
+
+		It("fails to create reconciler when MC namespace is empty", func(ctx context.Context) {
+			mcName.Namespace = ""
+			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, mcName, nil)
 			Expect(err).Should(HaveOccurred())
 			Expect(reconciler).To(BeNil())
 		})
@@ -46,6 +70,22 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 		// These tests don't rely on internal state.
 		reconciler := new(controllers.KubeadmControlPlaneReconciler)
 		namespace, name := "default", "test"
+
+		Describe("Management AzureCluster", func() {
+			It("cancels when the management cluster is not private", func(ctx context.Context) {
+				azureCluster := NewAzureClusterBuilder("", "").WithAPILoadBalancerType(capz.Public).Build()
+
+				err := reconciler.PreflightCheckManagementCluster(ctx, azureCluster)
+				Expect(err).To(MatchError(controllers.ErrReasonManagementClusterNotPrivate))
+			})
+
+			It("proceeds when all preflight checks pass", func(ctx context.Context) {
+				azureCluster := NewAzureClusterBuilder("", "").WithAPILoadBalancerType(capz.Internal).Build()
+
+				err := reconciler.PreflightCheckManagementCluster(ctx, azureCluster)
+				Expect(err).ShouldNot(HaveOccurred())
+			})
+		})
 
 		Describe("ControlPlane", func() {
 			It("cancels when the control plane is being deleted", func(ctx context.Context) {
@@ -73,7 +113,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				Expect(err).To(MatchError(controllers.ErrReasonControlPlaneHasNoOwner))
 			})
 
-			It("proceeds when all preflight conditions are met", func(ctx context.Context) {
+			It("proceeds when all preflight checks pass", func(ctx context.Context) {
 				kcp := NewKubeadmControlPlaneBuilder(namespace, name).Build()
 				_ = NewClusterBuilder(scheme).WithControlPlane(kcp).Build()
 
@@ -97,7 +137,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				Expect(err).To(MatchError(controllers.ErrReasonInfraClusterMissing))
 			})
 
-			It("proceeds when all conditions are met", func(ctx context.Context) {
+			It("proceeds when all preflight checks pass", func(ctx context.Context) {
 				azureCluster := NewAzureClusterBuilder("", "").Build()
 				cluster := NewClusterBuilder(scheme).WithAzureCluster(azureCluster).Build()
 
@@ -105,30 +145,17 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 			})
 		})
-
-		Describe("AzureCluster", func() {
-			It("cancels when the AzureCluster is not private", func(ctx context.Context) {
-				azureCluster := NewAzureClusterBuilder("", "").WithAPILoadBalancerType(capz.Public).Build()
-
-				err := reconciler.PreflightCheckAzureCluster(ctx, azureCluster)
-				Expect(err).To(MatchError(controllers.ErrReasonInfraClusterNotPrivate))
-			})
-
-			It("proceeds when all conditions are met", func(ctx context.Context) {
-				azureCluster := NewAzureClusterBuilder("", "").WithAPILoadBalancerType(capz.Internal).Build()
-
-				err := reconciler.PreflightCheckAzureCluster(ctx, azureCluster)
-				Expect(err).ShouldNot(HaveOccurred())
-			})
-		})
 	})
 
 	Describe("Reconciliation", func() {
-		It("pauses the control plane when conditions are unmet", func(ctx context.Context) {
+		It("pauses the control plane when infracluster status conditions are unmet", func(ctx context.Context) {
 			name, namespace := "test", "org-giantswarm"
+			mcInfraCluster := NewAzureClusterBuilder("", "management-cluster").
+				WithAPILoadBalancerType(capz.Internal).
+				Build()
+			mcName := types.NamespacedName{Namespace: mcInfraCluster.Namespace, Name: mcInfraCluster.Name}
 			kcp := NewKubeadmControlPlaneBuilder(namespace, name).Build()
 			infraCluster := NewAzureClusterBuilder("", name).
-				WithAPILoadBalancerType(capz.Internal).
 				Build()
 			cluster := NewClusterBuilder(scheme).
 				WithControlPlane(kcp).
@@ -137,10 +164,10 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 
 			client := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(kcp, infraCluster, cluster).
+				WithObjects(mcInfraCluster, kcp, infraCluster, cluster).
 				Build()
 
-			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, &controllers.KubeadmControlPlaneReconcilerOptions{
+			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, mcName, &controllers.KubeadmControlPlaneReconcilerOptions{
 				AzureClusterGates: []capi.ConditionType{"NotMet"},
 			})
 			Expect(err).ShouldNot(HaveOccurred())
@@ -161,6 +188,10 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				Type:   "YesMet",
 				Status: corev1.ConditionTrue,
 			}
+			mcInfraCluster := NewAzureClusterBuilder("", "management-cluster").
+				WithAPILoadBalancerType(capz.Internal).
+				Build()
+			mcName := types.NamespacedName{Namespace: mcInfraCluster.Namespace, Name: mcInfraCluster.Name}
 			kcp := NewKubeadmControlPlaneBuilder(namespace, name).WithPause().Build()
 			infraCluster := NewAzureClusterBuilder("", name).
 				WithAPILoadBalancerType(capz.Internal).
@@ -173,10 +204,10 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 
 			client := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(kcp, infraCluster, cluster).
+				WithObjects(mcInfraCluster, kcp, infraCluster, cluster).
 				Build()
 
-			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, &controllers.KubeadmControlPlaneReconcilerOptions{
+			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, mcName, &controllers.KubeadmControlPlaneReconcilerOptions{
 				AzureClusterGates: []capi.ConditionType{condition.Type},
 			})
 			Expect(err).ShouldNot(HaveOccurred())

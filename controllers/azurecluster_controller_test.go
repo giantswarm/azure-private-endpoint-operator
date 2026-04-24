@@ -20,6 +20,7 @@ import (
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure/mock_azure"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privateendpoints"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/privatelinks"
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 )
@@ -29,6 +30,8 @@ const (
 	testPrivateEndpointIpForWcAPI     = "10.10.10.10"
 	testPrivateLinkNameForMcIngress   = "giant-ingress-privatelink"
 	testPrivateEndpointIpForMcIngress = "10.10.10.11"
+	testPrivateLinkNameForMcGateway   = "giant-gateway-privatelink"
+	testPrivateEndpointIpForMcGateway = "10.10.10.12"
 )
 
 var _ = Describe("AzureClusterReconciler", func() {
@@ -93,21 +96,21 @@ var _ = Describe("AzureClusterReconciler", func() {
 	Describe("creating reconciler", func() {
 		It("creates reconciler", func(ctx context.Context) {
 			var err error
-			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName)
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(reconciler).NotTo(BeNil())
 		})
 
 		It("fails to create reconciler when client is nil", func(ctx context.Context) {
 			var err error
-			_, err = controllers.NewAzureClusterReconciler(nil, privateEndpointsClientCreator, managementClusterNamespacedName)
+			_, err = controllers.NewAzureClusterReconciler(nil, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalidConfig(err)).To(BeTrue())
 		})
 
 		It("fails to create reconciler when private endpoints creator is nil", func(ctx context.Context) {
 			var err error
-			_, err = controllers.NewAzureClusterReconciler(k8sClient, nil, managementClusterNamespacedName)
+			_, err = controllers.NewAzureClusterReconciler(k8sClient, nil, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalidConfig(err)).To(BeTrue())
 		})
@@ -115,7 +118,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 		It("fails to create reconciler when MC name is empty", func(ctx context.Context) {
 			var err error
 			managementClusterNamespacedName.Name = ""
-			_, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName)
+			_, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalidConfig(err)).To(BeTrue())
 		})
@@ -123,7 +126,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 		It("fails to create reconciler when MC namespace is empty", func(ctx context.Context) {
 			var err error
 			managementClusterNamespacedName.Namespace = ""
-			_, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName)
+			_, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalidConfig(err)).To(BeTrue())
 		})
@@ -133,7 +136,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 		When("workload AzureCluster resources does not exist", func() {
 			JustBeforeEach(func() {
 				var err error
-				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName)
+				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -159,7 +162,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 			JustBeforeEach(func() {
 				var err error
-				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName)
+				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -189,7 +192,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 			JustBeforeEach(func() {
 				var err error
-				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName)
+				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -215,7 +218,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 			JustBeforeEach(func() {
 				var err error
-				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName)
+				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -275,7 +278,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		JustBeforeEach(func() {
 			var err error
-			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName)
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -386,6 +389,11 @@ var _ = Describe("AzureClusterReconciler", func() {
 						workloadClusterName,
 						fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName),
 						testPrivateEndpointIpForMcIngress)
+					testhelpers.SetupPrivateEndpointClientToReturnPrivateIp(
+						privateEndpointsClient,
+						workloadClusterName,
+						fmt.Sprintf("%s-to-%s-gateway-privateendpoint", workloadClusterName, managementClusterName),
+						testPrivateEndpointIpForMcGateway)
 				}
 				return privateEndpointsClient, nil
 			}
@@ -393,7 +401,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		JustBeforeEach(func() {
 			var err error
-			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName)
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -435,19 +443,26 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 			privateEndpointIpForMcIngress, ok := workloadAzureCluster.Annotations[privatelinks.AzurePrivateEndpointOperatorMcIngressAnnotation]
 			Expect(ok).To(BeTrue())
-			Expect(privateEndpointIpForMcIngress).To(Equal(testPrivateEndpointIpForMcIngress))
+			Expect(privateEndpointIpForMcIngress).To(Equal(testPrivateEndpointIpForMcGateway))
 
-			// done: private endpoint has been added to the WC
-			expectedPrivateEndpointInWc := testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName)).
+			// done: both private endpoints have been added to the WC
+			expectedIngressPrivateEndpointInWc := testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", workloadClusterName, managementClusterName)).
 				WithLocation(location).
 				WithPrivateLinkServiceConnectionWithName(subscriptionID, managementClusterName, testPrivateLinkNameForMcIngress,
 					fmt.Sprintf("%s-to-%s-connection", workloadClusterName, managementClusterName)).
 				Build()
-			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(1))
+			expectedGatewayPrivateEndpointInWc := testhelpers.NewPrivateEndpointBuilder(fmt.Sprintf("%s-to-%s-gateway-privateendpoint", workloadClusterName, managementClusterName)).
+				WithLocation(location).
+				WithPrivateLinkServiceConnectionWithName(subscriptionID, managementClusterName, testPrivateLinkNameForMcGateway,
+					fmt.Sprintf("%s-to-%s-gateway-connection", workloadClusterName, managementClusterName)).
+				Build()
+			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(2))
 
-			// normalize resource before comparison (we don't care about this field here)
+			// normalize resources before comparison (we don't care about this field here)
 			workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0].PrivateLinkServiceConnections[0].RequestMessage = ""
-			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0]).To(Equal(expectedPrivateEndpointInWc))
+			workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[1].PrivateLinkServiceConnections[0].RequestMessage = ""
+			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0]).To(Equal(expectedIngressPrivateEndpointInWc))
+			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[1]).To(Equal(expectedGatewayPrivateEndpointInWc))
 		})
 	})
 
@@ -481,7 +496,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		JustBeforeEach(func() {
 			var err error
-			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName)
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -515,7 +530,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		JustBeforeEach(func() {
 			var err error
-			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName)
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
 			Expect(err).NotTo(HaveOccurred())
 		})
 

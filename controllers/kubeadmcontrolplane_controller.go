@@ -89,7 +89,7 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 	logger.Info("starting reconciliation")
 	defer logger.Info("finished reconciliation")
 
-	managementCluster := new(capz.AzureCluster)
+	managementAzureCluster := new(capz.AzureCluster)
 	err = r.client.Get(ctx, r.managementCluster, managementCluster)
 	if err != nil {
 		if apierrors.IsNotFound(err) {

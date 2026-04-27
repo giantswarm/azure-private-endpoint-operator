@@ -19,7 +19,6 @@ const (
 	AzurePrivateEndpointOperatorMcIngressAnnotation string = "azure-private-endpoint-operator.giantswarm.io/private-link-mc-ingress-ip"
 )
 
-
 func NewScope(workloadCluster *capz.AzureCluster, client client.Client) (*Scope, error) {
 	if workloadCluster == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "workloadCluster must be set")

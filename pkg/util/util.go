@@ -28,7 +28,7 @@ func ConvertToStringSlice(pointers []*string) []string {
 // Any condition that is not listed in parameter 'gates' is ignored.
 // It returns a slice of unmet conditions for reporting.
 // If all conditions are met, the returned slice is empty.
-func AreStatusConditionsMet(conditions v1beta1.Conditions, gates []v1beta1.ConditionType) []v1beta1.ConditionType {
+func FindUnmetStatusConditions(conditions v1beta1.Conditions, gates []v1beta1.ConditionType) []v1beta1.ConditionType {
 	if gates == nil {
 		return nil
 	}

@@ -69,6 +69,15 @@ func (s *BaseScope) SetAnnotation(annotation, value string) {
 	s.azureCluster.SetAnnotations(annotations)
 }
 
+func (s *BaseScope) SetCondition(condition capi.Condition) {
+	conditions := s.azureCluster.GetConditions()
+	if conditions == nil {
+		conditions = make(capi.Conditions, 0)
+	}
+	conditions = append(conditions, condition)
+	s.azureCluster.SetConditions(conditions)
+}
+
 func (s *BaseScope) Close(ctx context.Context) error {
 	err := s.PatchObject(ctx)
 	if err != nil {

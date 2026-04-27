@@ -1,0 +1,264 @@
+package controllers
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"reflect"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+	caputil "sigs.k8s.io/cluster-api/util"
+	"sigs.k8s.io/cluster-api/util/patch"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
+)
+
+var (
+	ErrReconcileCancelled                = errors.New("reconciliation cancelled")
+	ErrReasonManagementClusterNotPrivate = errors.New("management cluster is not private")
+	ErrReasonControlPlaneDeleted         = errors.New("control plane has been deleted")
+	ErrReasonControlPlaneDeleting        = errors.New("control plane is being deleted")
+	ErrReasonControlPlaneProvisioned     = errors.New("control plane is provisioned")
+	ErrReasonControlPlaneHasNoOwner      = errors.New("control plane does not yet have an owner")
+	ErrReasonClusterPaused               = errors.New("owning cluster is paused")
+	ErrReasonInfraClusterMissing         = errors.New("owning cluster has no infrastructure ref")
+)
+
+type KubeadmControlPlaneReconcilerOptions struct {
+	AzureClusterGates []capi.ConditionType
+}
+
+func NewKubeadmControlPlaneReconciler(client client.Client, managmentCluster types.NamespacedName, opts *KubeadmControlPlaneReconcilerOptions) (*KubeadmControlPlaneReconciler, error) {
+	if client == nil {
+		return nil, errors.New("failed to build reconciler: client is nil")
+	}
+
+	if managmentCluster.Name == "" {
+		return nil, errors.New("management cluster name must be set")
+	}
+
+	if managmentCluster.Namespace == "" {
+		return nil, errors.New("management cluster namespace must be set")
+	}
+
+	r := &KubeadmControlPlaneReconciler{
+		client:            client,
+		managementCluster: managmentCluster,
+	}
+
+	if opts != nil {
+		r.azureClusterGates = opts.AzureClusterGates
+	}
+
+	return r, nil
+}
+
+// KubeadmControlPlaneReconciler pauses or unpauses reconciliation of a cluster's KubeadmControlPlane
+// based on the status conditions of its AzureCluster. A new KubeadmControlPlane will be automatically
+// paused, and will remain so until all status conditions pass.
+type KubeadmControlPlaneReconciler struct {
+	client            client.Client
+	managementCluster types.NamespacedName
+	azureClusterGates []capi.ConditionType
+}
+
+// Reconcile KubeadmControlPlane to ensure that its associated InfraCluster has passed
+// specific status conditions. As long as these conditions are not met, the KubeadmControlPlane
+// is paused.
+func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
+	if len(r.azureClusterGates) == 0 {
+		// No gates, so no checks to perform.
+		return
+	}
+
+	logger := log.FromContext(ctx).WithValues("controlplane", req.NamespacedName)
+
+	logger.Info("starting reconciliation")
+	defer logger.Info("finished reconciliation")
+
+	managementInfraCluster := new(capz.AzureCluster)
+	err = r.client.Get(ctx, r.managementCluster, managementInfraCluster)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("management cluster has been deleted")
+			return result, nil
+		}
+		return
+	}
+
+	if err = r.PreflightCheckManagementCluster(ctx, managementInfraCluster); err != nil {
+		if errors.Is(err, ErrReconcileCancelled) {
+			logger.Info(err.Error())
+			return result, nil
+		}
+		return
+	}
+
+	kcp := new(v1beta1.KubeadmControlPlane)
+	err = r.client.Get(ctx, req.NamespacedName, kcp)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("control plane has been deleted")
+			return result, nil
+		}
+		return
+	}
+
+	if err = r.PreflightCheckControlPlane(ctx, kcp); err != nil {
+		if errors.Is(err, ErrReconcileCancelled) {
+			logger.Info(err.Error())
+			return result, nil
+		}
+		return
+	}
+
+	cluster, err := caputil.GetOwnerCluster(ctx, r.client, kcp.ObjectMeta)
+	if err != nil {
+		return
+	}
+
+	if err = r.PreflightCheckCluster(ctx, cluster); err != nil {
+		if errors.Is(err, ErrReconcileCancelled) {
+			logger.Info(err.Error())
+			return result, nil
+		}
+		return
+	}
+
+	infraCluster := new(capz.AzureCluster)
+	err = r.client.Get(ctx, types.NamespacedName{
+		Namespace: cluster.Spec.InfrastructureRef.Namespace,
+		Name:      cluster.Spec.InfrastructureRef.Name,
+	}, infraCluster)
+	if err != nil {
+		return
+	}
+
+	helper, err := patch.NewHelper(kcp, r.client)
+	if err != nil {
+		return result, err
+	}
+	defer helper.Patch(ctx, kcp)
+
+	unmet := util.FindUnmetStatusConditions(infraCluster.Status.Conditions, r.azureClusterGates)
+	if len(unmet) != 0 {
+		logger.Info("pausing control plane because infrastructure cluster conditions were not met", "conditions", unmet)
+		annotations := kcp.GetAnnotations()
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations[capi.PausedAnnotation] = "true"
+		kcp.SetAnnotations(annotations)
+		return
+	}
+
+	annotations := kcp.GetAnnotations()
+	if _, ok := annotations[capi.PausedAnnotation]; ok {
+		logger.Info("unpausing control plane because all infrastructure cluster conditions were met")
+		delete(annotations, capi.PausedAnnotation)
+		kcp.SetAnnotations(annotations)
+	}
+	return
+}
+
+func (r *KubeadmControlPlaneReconciler) PreflightCheckManagementCluster(ctx context.Context, azureCluster *capz.AzureCluster) error {
+	if azureCluster.Spec.NetworkSpec.APIServerLB.Type != capz.Internal {
+		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonManagementClusterNotPrivate)
+	}
+
+	return nil
+}
+
+// PreflightCheckControlPlane asserts that it is safe to proceed reconciling the KubeamControlPlane.
+func (r *KubeadmControlPlaneReconciler) PreflightCheckControlPlane(ctx context.Context, kcp *v1beta1.KubeadmControlPlane) error {
+	if kcp.Status.Ready {
+		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonControlPlaneProvisioned)
+	}
+
+	// Normally when an object is being deleted, a reconciler goes into a deletion reconcile loop.
+	// But as of writing, this reconciler only pauses or unpauses the control plane.
+	// It is not involved at all in deletion.
+	if !kcp.DeletionTimestamp.IsZero() {
+		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonControlPlaneDeleting)
+	}
+
+	if !controllerutil.HasControllerReference(kcp) {
+		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonControlPlaneHasNoOwner)
+	}
+
+	return nil
+}
+
+func (r *KubeadmControlPlaneReconciler) PreflightCheckCluster(ctx context.Context, cluster *capi.Cluster) error {
+	// If the Cluster is paused, then we should not, in any circumstance, unpause the control plane.
+	if cluster.Spec.Paused {
+		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonClusterPaused)
+	}
+
+	if cluster.Spec.InfrastructureRef == nil {
+		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonInfraClusterMissing)
+	}
+
+	return nil
+}
+
+func (r *KubeadmControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	azureClusterConditionsChanged := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			old, ok := e.ObjectOld.(*capz.AzureCluster)
+			if !ok {
+				return false
+			}
+			new, ok := e.ObjectNew.(*capz.AzureCluster)
+			if !ok {
+				return false
+			}
+			return !reflect.DeepEqual(old.Status.Conditions, new.Status.Conditions)
+		},
+		CreateFunc:  func(e event.CreateEvent) bool { return false },
+		DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+		GenericFunc: func(e event.GenericEvent) bool { return false },
+	}
+
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&v1beta1.KubeadmControlPlane{}).
+		Watches(&capz.AzureCluster{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, ac client.Object) []reconcile.Request {
+			logger := mgr.GetLogger()
+
+			azureCluster, ok := ac.(*capz.AzureCluster)
+			if !ok {
+				return nil
+			}
+
+			cluster, err := caputil.GetOwnerCluster(ctx, mgr.GetClient(), azureCluster.ObjectMeta)
+			if err != nil {
+				logger.Error(err, "while getting owning cluster", "infracluster", azureCluster.Name)
+				return nil
+			}
+
+			if cluster.Spec.ControlPlaneRef == nil {
+				return nil
+			}
+
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Namespace: cluster.Namespace,
+					Name:      cluster.Spec.ControlPlaneRef.Name,
+				},
+			}}
+		}), builder.WithPredicates(azureClusterConditionsChanged)).
+		Complete(r)
+}

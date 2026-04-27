@@ -77,7 +77,7 @@ var _ = Describe("Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private links scope
-			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client, "")
+			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private endpoints service
@@ -124,7 +124,7 @@ var _ = Describe("Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private links scope
-			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client, "")
+			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private endpoints service
@@ -176,7 +176,7 @@ var _ = Describe("Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private links scope
-			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client, "")
+			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private endpoints service
@@ -283,7 +283,7 @@ var _ = Describe("Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private links scope
-			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client, "")
+			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private endpoints service
@@ -360,7 +360,7 @@ var _ = Describe("Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private links scope
-			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client, "")
+			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private endpoints service
@@ -432,7 +432,7 @@ var _ = Describe("Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private links scope
-			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client, "")
+			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private endpoints service

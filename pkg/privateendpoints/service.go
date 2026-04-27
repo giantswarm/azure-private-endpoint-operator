@@ -20,9 +20,6 @@ import (
 
 const (
 	ConditionGSPrivateLinksReady capi.ConditionType = "GSPrivateLinksReady"
-
-	McIngressIPSourceIngress = "ingress"
-	McIngressIPSourceGateway = "gateway"
 )
 
 // PrivateLinksScope is the interface for getting private links for which the private endpoints are needed.
@@ -35,7 +32,6 @@ type PrivateLinksScope interface {
 	LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLink, bool)
 	PatchObject(ctx context.Context) error
 	PrivateLinksReady() bool
-	IsMcIngressEndpoint(name string) bool
 	SetPrivateEndpointIPAddressForWcApi(ip net.IP)
 	SetPrivateEndpointIPAddressForMcIngress(ip net.IP)
 	SetCondition(condition capi.Condition)
@@ -169,11 +165,8 @@ func (s *Service) ReconcileWcToMcIngress(ctx context.Context, specs []capz.Priva
 			return microerror.Mask(err)
 		}
 		logger.Info("found private endpoint IP address in WC", "name", spec.Name, "ipAddress", ip.String())
-
-		if s.privateLinksScope.IsMcIngressEndpoint(spec.Name) {
-			s.privateLinksScope.SetPrivateEndpointIPAddressForMcIngress(ip)
-			logger.Info("set private endpoint IP address in WC AzureCluster", "name", spec.Name, "ipAddress", ip.String())
-		}
+		s.privateLinksScope.SetPrivateEndpointIPAddressForMcIngress(ip)
+		logger.Info("set private endpoint IP address in WC AzureCluster", "name", spec.Name, "ipAddress", ip.String())
 	}
 
 	s.privateLinksScope.SetCondition(capi.Condition{

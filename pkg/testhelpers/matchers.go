@@ -33,7 +33,7 @@ func (m *matchStatusCondition) Match(actual any) (success bool, err error) {
 }
 
 func (m *matchStatusCondition) FailureMessage(actual any) (message string) {
-	return fmt.Sprintf("expected status conditions\n\t%#v\nto meet\n\t%#v\n", actual, m.unmet)
+	return fmt.Sprintf("expected status conditions\n\t%#v\nto match\n\t%#v\n", actual, m.unmet)
 }
 
 func (m *matchStatusCondition) NegatedFailureMessage(actual any) (message string) {

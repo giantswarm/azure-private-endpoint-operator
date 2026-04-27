@@ -38,3 +38,4 @@ azure:
 
 operator:
   mcIngressIPSource: "ingress"
+  ingressPrivateEndpointEnabled: true

@@ -49,6 +49,7 @@ spec:
         - -management-cluster-name={{ .Values.managementCluster.name }}
         - -management-cluster-namespace={{ .Values.managementCluster.namespace }}
         - --mc-ingress-ip-source={{ .Values.operator.mcIngressIPSource }}
+        - --ingress-privateendpoint-enabled={{ .Values.operator.ingressPrivateEndpointEnabled }}
         env:
         - name: POD_NAME
           valueFrom:

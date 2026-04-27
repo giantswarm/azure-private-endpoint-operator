@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `--ingress-privateendpoint-enabled` flag (bool, default `true`) to enable/disable creation of the ingress private endpoint (`<wc>-to-<mc>-privatelink-privateendpoint`) in workload clusters.
+- Expose `operator.ingressPrivateEndpointEnabled` Helm value (default `true`) to configure the flag.
+
 ## [0.4.0] - 2026-04-24
 
 ### Added

@@ -401,7 +401,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		JustBeforeEach(func() {
 			var err error
-			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway, IngressPrivateEndpointEnabled: true})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -530,7 +530,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		JustBeforeEach(func() {
 			var err error
-			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway})
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{McIngressIPSource: privateendpoints.McIngressIPSourceGateway, IngressPrivateEndpointEnabled: true})
 			Expect(err).NotTo(HaveOccurred())
 		})
 

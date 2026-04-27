@@ -43,7 +43,8 @@ const (
 
 // Options holds optional configuration for AzureClusterReconciler.
 type Options struct {
-	McIngressIPSource string
+	McIngressIPSource              string
+	IngressPrivateEndpointEnabled  bool
 }
 
 // AzureClusterReconciler reconciles a AzureCluster object
@@ -189,7 +190,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		//   a private link for the gateway (<mc-name>-gateway-privatelink).
 		// We add private endpoints to WC so that monitoring tools in WC can access MC ingress and gateway.
 		if err == nil && managementAzureCluster.Spec.NetworkSpec.APIServerLB.Type == capz.Internal {
-			err = wcPrivateEndpointsService.ReconcileWcToMcIngress(ctx, generateWcToMcPrivateEndpointSpecs(workloadAzureCluster, managementAzureCluster))
+			err = wcPrivateEndpointsService.ReconcileWcToMcIngress(ctx, generateWcToMcPrivateEndpointSpecs(workloadAzureCluster, managementAzureCluster, r.options.IngressPrivateEndpointEnabled))
 		}
 
 		if errors.IsRetriable(err) {
@@ -219,23 +220,28 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 // generateWcToMcPrivateEndpointSpecs generates PrivateEndpointSpecs for the private endpoints that
 // connect the WC to the ingress and gateway of the management cluster.
 // It assumes private links named "<mc-name>-ingress-privatelink" and "<mc-name>-gateway-privatelink".
-func generateWcToMcPrivateEndpointSpecs(wc capz.AzureCluster, mc capz.AzureCluster) []capz.PrivateEndpointSpec {
-	ingressSpec := capz.PrivateEndpointSpec{
-		Name:     fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", wc.Name, mc.Name),
-		Location: wc.Spec.Location,
-		PrivateLinkServiceConnections: []capz.PrivateLinkServiceConnection{
-			{
-				Name: fmt.Sprintf("%s-to-%s-connection", wc.Name, mc.Name),
-				PrivateLinkServiceID: fmt.Sprintf(
-					"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
-					mc.Spec.SubscriptionID,
-					mc.Name,
-					fmt.Sprintf("%s-ingress-privatelink", mc.Name)),
+func generateWcToMcPrivateEndpointSpecs(wc capz.AzureCluster, mc capz.AzureCluster, ingressPrivateEndpointEnabled bool) []capz.PrivateEndpointSpec {
+	var specs []capz.PrivateEndpointSpec
+
+	if ingressPrivateEndpointEnabled {
+		specs = append(specs, capz.PrivateEndpointSpec{
+			Name:     fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", wc.Name, mc.Name),
+			Location: wc.Spec.Location,
+			PrivateLinkServiceConnections: []capz.PrivateLinkServiceConnection{
+				{
+					Name: fmt.Sprintf("%s-to-%s-connection", wc.Name, mc.Name),
+					PrivateLinkServiceID: fmt.Sprintf(
+						"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
+						mc.Spec.SubscriptionID,
+						mc.Name,
+						fmt.Sprintf("%s-ingress-privatelink", mc.Name)),
+				},
 			},
-		},
-		ManualApproval: false,
+			ManualApproval: false,
+		})
 	}
-	gatewaySpec := capz.PrivateEndpointSpec{
+
+	specs = append(specs, capz.PrivateEndpointSpec{
 		Name:     fmt.Sprintf("%s-to-%s-gateway-privateendpoint", wc.Name, mc.Name),
 		Location: wc.Spec.Location,
 		PrivateLinkServiceConnections: []capz.PrivateLinkServiceConnection{
@@ -249,8 +255,9 @@ func generateWcToMcPrivateEndpointSpecs(wc capz.AzureCluster, mc capz.AzureClust
 			},
 		},
 		ManualApproval: false,
-	}
-	return []capz.PrivateEndpointSpec{ingressSpec, gatewaySpec}
+	})
+
+	return specs
 }
 
 // validateLBType checks if the load balancer type is either Internal or Public. Any

@@ -56,13 +56,14 @@ func init() {
 
 func main() {
 	var (
-		metricsAddr                string
-		enableLeaderElection       bool
-		probeAddr                  string
-		managementClusterName      string
-		managementClusterNamespace string
-		syncPeriod                 time.Duration
-		mcIngressIPSource          string
+		metricsAddr                        string
+		enableLeaderElection               bool
+		probeAddr                          string
+		managementClusterName              string
+		managementClusterNamespace         string
+		syncPeriod                         time.Duration
+		mcIngressIPSource                  string
+		ingressPrivateEndpointEnabled      bool
 	)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080",
 		"The address the metric endpoint binds to.")
@@ -79,6 +80,8 @@ func main() {
 		"The minimum interval at which watched resources are reconciled (e.g. 15m)")
 	flag.StringVar(&mcIngressIPSource, "mc-ingress-ip-source", "ingress",
 		"Source private endpoint for the MC ingress IP annotation (ingress or gateway)")
+	flag.BoolVar(&ingressPrivateEndpointEnabled, "ingress-privateendpoint-enabled", true,
+		"Enable creation of the private endpoint for the MC ingress private link in workload clusters")
 	opts := zap.Options{
 		Development: false,
 		TimeEncoder: zapcore.ISO8601TimeEncoder,
@@ -124,7 +127,8 @@ func main() {
 		Name:      managementClusterName,
 	}
 	azureClusterReconciler, err := controllers.NewAzureClusterReconciler(mgr.GetClient(), azure.NewPrivateEndpointClient, mcNamespacedName, controllers.Options{
-		McIngressIPSource: mcIngressIPSource,
+		McIngressIPSource:             mcIngressIPSource,
+		IngressPrivateEndpointEnabled: ingressPrivateEndpointEnabled,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to create new AzureClusterReconciler")

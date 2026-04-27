@@ -51,6 +51,7 @@ spec:
         {{- with .Values.azureClusterGates }}
         - -azure-cluster-gates={{ join "," . }}
         {{- end }}
+        - --mc-ingress-ip-source={{ .Values.operator.mcIngressIPSource }}
         env:
         - name: POD_NAME
           valueFrom:

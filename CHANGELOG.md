@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-24
+
+### Added
+
+- Support migration to Gateway API
+  - Add gateway private endpoint (`<wc>-to-<mc>-gateway-privateendpoint`) connecting to `<mc>-gateway-privatelink` alongside the existing ingress private endpoint in each workload cluster.
+  - Add `--mc-ingress-ip-source` flag (`ingress` or `gateway`, default `ingress`) to control which private endpoint's IP is written to the `azure-private-endpoint-operator.giantswarm.io/private-link-mc-ingress-ip` annotation on the WC `AzureCluster` CR.
+  - Expose `operator.mcIngressIPSource` Helm value (default `ingress`) to configure the flag.
+
 ### Removed
 
 - Removed `PodSecurityPolicy`.
@@ -92,7 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated Dockerfile
 
-[Unreleased]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.2.5...v0.3.0

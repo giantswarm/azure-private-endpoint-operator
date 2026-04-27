@@ -42,9 +42,7 @@ const (
 )
 
 // Options holds optional configuration for AzureClusterReconciler.
-type Options struct {
-	McIngressIPSource string
-}
+type Options struct{}
 
 // AzureClusterReconciler reconciles a AzureCluster object
 type AzureClusterReconciler struct {
@@ -67,10 +65,6 @@ func NewAzureClusterReconciler(client client.Client, privateEndpointsClientCreat
 	if managementClusterName.Namespace == "" {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "%T.Namespace must be set", managementClusterName)
 	}
-	if options.McIngressIPSource != privateendpoints.McIngressIPSourceIngress && options.McIngressIPSource != privateendpoints.McIngressIPSourceGateway {
-		return nil, microerror.Maskf(errors.InvalidConfigError, "options.McIngressIPSource must be %q or %q, got %q", privateendpoints.McIngressIPSourceIngress, privateendpoints.McIngressIPSourceGateway, options.McIngressIPSource)
-	}
-
 	return &AzureClusterReconciler{
 		Client:                        client,
 		privateEndpointsClientCreator: privateEndpointsClientCreator,
@@ -124,7 +118,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Create WC private links scope - we use this to get the info about the private workload
 	// cluster private links, and then we make sure to have a private endpoints that connect to the
 	// private links.
-	privateLinksScope, err := privatelinks.NewScope(&workloadAzureCluster, r.Client, r.options.McIngressIPSource)
+	privateLinksScope, err := privatelinks.NewScope(&workloadAzureCluster, r.Client)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
@@ -183,11 +177,9 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			err = mcPrivateEndpointsService.ReconcileMcToWcApi(ctx)
 		}
 
-		// When LB of k8s api of MC is internal load balancer, we assume
-		// - The cluster is private and both ingress and gateway LBs are internal.
-		// - There is a private link for the ingress LB (<mc-name>-ingress-privatelink) and
-		//   a private link for the gateway (<mc-name>-gateway-privatelink).
-		// We add private endpoints to WC so that monitoring tools in WC can access MC ingress and gateway.
+		// When LB of k8s api of MC is internal load balancer, we assume the cluster is private
+		// and the gateway LB is internal with a private link (<mc-name>-gateway-privatelink).
+		// We add a private endpoint to WC so that monitoring tools in WC can access the MC gateway.
 		if err == nil && managementAzureCluster.Spec.NetworkSpec.APIServerLB.Type == capz.Internal {
 			err = wcPrivateEndpointsService.ReconcileWcToMcIngress(ctx, generateWcToMcPrivateEndpointSpecs(workloadAzureCluster, managementAzureCluster))
 		}
@@ -216,25 +208,10 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-// generateWcToMcPrivateEndpointSpecs generates PrivateEndpointSpecs for the private endpoints that
-// connect the WC to the ingress and gateway of the management cluster.
-// It assumes private links named "<mc-name>-ingress-privatelink" and "<mc-name>-gateway-privatelink".
+// generateWcToMcPrivateEndpointSpecs generates PrivateEndpointSpecs for the private endpoint that
+// connects the WC to the gateway of the management cluster.
+// It assumes a private link named "<mc-name>-gateway-privatelink".
 func generateWcToMcPrivateEndpointSpecs(wc capz.AzureCluster, mc capz.AzureCluster) []capz.PrivateEndpointSpec {
-	ingressSpec := capz.PrivateEndpointSpec{
-		Name:     fmt.Sprintf("%s-to-%s-privatelink-privateendpoint", wc.Name, mc.Name),
-		Location: wc.Spec.Location,
-		PrivateLinkServiceConnections: []capz.PrivateLinkServiceConnection{
-			{
-				Name: fmt.Sprintf("%s-to-%s-connection", wc.Name, mc.Name),
-				PrivateLinkServiceID: fmt.Sprintf(
-					"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateLinkServices/%s",
-					mc.Spec.SubscriptionID,
-					mc.Name,
-					fmt.Sprintf("%s-ingress-privatelink", mc.Name)),
-			},
-		},
-		ManualApproval: false,
-	}
 	gatewaySpec := capz.PrivateEndpointSpec{
 		Name:     fmt.Sprintf("%s-to-%s-gateway-privateendpoint", wc.Name, mc.Name),
 		Location: wc.Spec.Location,
@@ -250,7 +227,7 @@ func generateWcToMcPrivateEndpointSpecs(wc capz.AzureCluster, mc capz.AzureClust
 		},
 		ManualApproval: false,
 	}
-	return []capz.PrivateEndpointSpec{ingressSpec, gatewaySpec}
+	return []capz.PrivateEndpointSpec{gatewaySpec}
 }
 
 // validateLBType checks if the load balancer type is either Internal or Public. Any

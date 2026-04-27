@@ -18,7 +18,7 @@ func TestUtilities(t *testing.T) {
 
 var _ = DescribeTable("AreStatusConditionsMet",
 	func(conditions v1beta1.Conditions, gates []v1beta1.ConditionType, want []v1beta1.ConditionType) {
-		unmet := AreStatusConditionsMet(conditions, gates)
+		unmet := FindUnmetStatusConditions(conditions, gates)
 		Expect(unmet).To(HaveExactElements(want))
 	},
 	Entry("When conditions are met returns no unmet conditions",

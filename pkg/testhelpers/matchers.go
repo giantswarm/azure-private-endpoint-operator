@@ -25,7 +25,7 @@ func (m *matchStatusCondition) Match(actual any) (success bool, err error) {
 		return false, fmt.Errorf("actual should be of type v1beta1.Conditions")
 	}
 
-	m.unmet = util.AreStatusConditionsMet(conditions, m.gates)
+	m.unmet = util.FindUnmetStatusConditions(conditions, m.gates)
 	if len(m.unmet) > 0 {
 		return false, nil
 	}

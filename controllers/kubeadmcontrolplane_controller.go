@@ -89,8 +89,8 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 	logger.Info("starting reconciliation")
 	defer logger.Info("finished reconciliation")
 
-	managementAzureCluster := new(capz.AzureCluster)
-	err = r.client.Get(ctx, r.managementCluster, managementCluster)
+	managementInfraCluster := new(capz.AzureCluster)
+	err = r.client.Get(ctx, r.managementCluster, managementInfraCluster)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.Info("management cluster has been deleted")
@@ -99,7 +99,7 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 		return
 	}
 
-	if err = r.PreflightCheckManagementCluster(ctx, managementCluster); err != nil {
+	if err = r.PreflightCheckManagementCluster(ctx, managementInfraCluster); err != nil {
 		if errors.Is(err, ErrReconcileCancelled) {
 			logger.Info(err.Error())
 			return result, nil
@@ -153,7 +153,7 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 	}
 	defer helper.Patch(ctx, kcp)
 
-	unmet := util.AreStatusConditionsMet(infraCluster.Status.Conditions, r.azureClusterGates)
+	unmet := util.FindUnmetStatusConditions(infraCluster.Status.Conditions, r.azureClusterGates)
 	if len(unmet) != 0 {
 		logger.Info("pausing control plane because infrastructure cluster conditions were not met", "conditions", unmet)
 		annotations := kcp.GetAnnotations()

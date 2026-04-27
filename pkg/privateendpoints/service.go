@@ -20,6 +20,7 @@ import (
 
 const (
 	ConditionGSPrivateLinksReady capi.ConditionType = "GSPrivateLinksReady"
+
 	McIngressIPSourceIngress = "ingress"
 	McIngressIPSourceGateway = "gateway"
 )

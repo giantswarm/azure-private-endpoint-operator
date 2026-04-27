@@ -3,7 +3,6 @@ package privatelinks
 import (
 	"fmt"
 	"net"
-	"regexp"
 
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,12 +19,7 @@ const (
 	AzurePrivateEndpointOperatorMcIngressAnnotation string = "azure-private-endpoint-operator.giantswarm.io/private-link-mc-ingress-ip"
 )
 
-var (
-	ingressEndpointRegex = regexp.MustCompile(`-privatelink-privateendpoint$`)
-	gatewayEndpointRegex = regexp.MustCompile(`-gateway-privateendpoint$`)
-)
-
-func NewScope(workloadCluster *capz.AzureCluster, client client.Client, mcIngressIPSource string) (*Scope, error) {
+func NewScope(workloadCluster *capz.AzureCluster, client client.Client) (*Scope, error) {
 	if workloadCluster == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "workloadCluster must be set")
 	}
@@ -39,9 +33,8 @@ func NewScope(workloadCluster *capz.AzureCluster, client client.Client, mcIngres
 	}
 
 	scope := Scope{
-		BaseScope:         *baseScope,
-		privateLinks:      workloadCluster.Spec.NetworkSpec.APIServerLB.PrivateLinks,
-		mcIngressIPSource: mcIngressIPSource,
+		BaseScope:    *baseScope,
+		privateLinks: workloadCluster.Spec.NetworkSpec.APIServerLB.PrivateLinks,
 	}
 
 	return &scope, nil
@@ -49,8 +42,7 @@ func NewScope(workloadCluster *capz.AzureCluster, client client.Client, mcIngres
 
 type Scope struct {
 	azurecluster.BaseScope
-	privateLinks      []capz.PrivateLink
-	mcIngressIPSource string
+	privateLinks []capz.PrivateLink
 }
 
 func (s *Scope) LookupPrivateLink(privateLinkResourceID string) (capz.PrivateLink, bool) {
@@ -81,18 +73,6 @@ func (s *Scope) GetPrivateLinksWithAllowedSubscription(managementClusterSubscrip
 
 func (s *Scope) PrivateLinksReady() bool {
 	return s.IsConditionTrue(capz.PrivateLinksReadyCondition)
-}
-
-// IsMcIngressEndpoint returns true if the given endpoint name matches the pattern
-// for the configured MC ingress IP source (ingress or gateway).
-func (s *Scope) IsMcIngressEndpoint(name string) bool {
-	switch s.mcIngressIPSource {
-	case "ingress":
-		return ingressEndpointRegex.MatchString(name)
-	case "gateway":
-		return gatewayEndpointRegex.MatchString(name)
-	}
-	return false
 }
 
 func (s *Scope) SetPrivateEndpointIPAddressForWcApi(ip net.IP) {

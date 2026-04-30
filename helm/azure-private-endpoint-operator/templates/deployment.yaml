@@ -48,6 +48,9 @@ spec:
         - --metrics-bind-address=:8777
         - -management-cluster-name={{ .Values.managementCluster.name }}
         - -management-cluster-namespace={{ .Values.managementCluster.namespace }}
+        {{- with .Values.azureClusterGates }}
+        - -azure-cluster-gates={{ join "," . }}
+        {{- end }}
         - --mc-ingress-ip-source={{ .Values.operator.mcIngressIPSource }}
         env:
         - name: POD_NAME

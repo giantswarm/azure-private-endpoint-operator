@@ -86,7 +86,9 @@ var _ = Describe("AzureClusterReconciler", func() {
 		if workloadAzureCluster != nil {
 			objects = append(objects, workloadAzureCluster)
 		}
-		k8sClientBuilder := fake.NewClientBuilder().WithScheme(capzSchema)
+		k8sClientBuilder := fake.NewClientBuilder().
+			WithScheme(capzSchema).
+			WithStatusSubresource(&capz.AzureCluster{})
 		if len(objects) > 0 {
 			k8sClientBuilder.WithObjects(objects...)
 		}
@@ -457,6 +459,9 @@ var _ = Describe("AzureClusterReconciler", func() {
 					fmt.Sprintf("%s-to-%s-gateway-connection", workloadClusterName, managementClusterName)).
 				Build()
 			Expect(workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(2))
+
+			// done: status condition has been added to the WC
+			Expect(workloadAzureCluster.GetConditions()).To(testhelpers.MeetConditions(privateendpoints.ConditionGSPrivateLinksReady))
 
 			// normalize resources before comparison (we don't care about this field here)
 			workloadAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints[0].PrivateLinkServiceConnections[0].RequestMessage = ""

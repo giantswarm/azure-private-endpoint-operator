@@ -23,6 +23,19 @@ rules:
   - update
   - watch
 #
+# KubeadmControlPlane
+#
+- apiGroups:
+  - controlplane.cluster.x-k8s.io
+  resources:
+  - kubeadmcontrolplanes
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+#
 # Leases
 #
 - apiGroups:

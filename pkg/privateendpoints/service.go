@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"net"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/util/slice"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/giantswarm/microerror"
@@ -17,6 +19,8 @@ import (
 )
 
 const (
+	ConditionGSPrivateLinksReady capi.ConditionType = "GSPrivateLinksReady"
+
 	McIngressIPSourceIngress = "ingress"
 	McIngressIPSourceGateway = "gateway"
 )
@@ -34,6 +38,7 @@ type PrivateLinksScope interface {
 	IsMcIngressEndpoint(name string) bool
 	SetPrivateEndpointIPAddressForWcApi(ip net.IP)
 	SetPrivateEndpointIPAddressForMcIngress(ip net.IP)
+	SetCondition(condition capi.Condition)
 	Close(ctx context.Context) error
 }
 
@@ -170,6 +175,12 @@ func (s *Service) ReconcileWcToMcIngress(ctx context.Context, specs []capz.Priva
 			logger.Info("set private endpoint IP address in WC AzureCluster", "name", spec.Name, "ipAddress", ip.String())
 		}
 	}
+
+	s.privateLinksScope.SetCondition(capi.Condition{
+		Type:    ConditionGSPrivateLinksReady,
+		Status:  v1.ConditionTrue,
+		Message: "GiantSwarm Private Link definitions have been added",
+	})
 
 	return nil
 }

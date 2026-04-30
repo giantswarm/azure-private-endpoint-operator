@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"strings"
 	"time"
 
 	"go.uber.org/zap/zapcore"
@@ -29,6 +30,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	kcp "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -48,9 +50,9 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(capi.AddToScheme(scheme))
 	utilruntime.Must(capz.AddToScheme(scheme))
+	utilruntime.Must(kcp.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -61,6 +63,7 @@ func main() {
 		probeAddr                  string
 		managementClusterName      string
 		managementClusterNamespace string
+		azureClusterGates          ConditionSliceVar
 		syncPeriod                 time.Duration
 		mcIngressIPSource          string
 	)
@@ -75,6 +78,8 @@ func main() {
 		"The name of the management cluster where this operator is running (also MC AzureCluster CR name)")
 	flag.StringVar(&managementClusterNamespace, "management-cluster-namespace", "",
 		"The namespace where the management cluster AzureCluster CR is deployed")
+	flag.Var(&azureClusterGates, "azure-cluster-gates",
+		"Status conditions on the workload AzureCluster CR that must be true before the control plane starts reconciling")
 	flag.DurationVar(&syncPeriod, "sync-period", 5*time.Minute,
 		"The minimum interval at which watched resources are reconciled (e.g. 15m)")
 	flag.StringVar(&mcIngressIPSource, "mc-ingress-ip-source", "ingress",
@@ -130,11 +135,23 @@ func main() {
 		setupLog.Error(err, "unable to create new AzureClusterReconciler")
 		os.Exit(1)
 	}
-
 	if err = azureClusterReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AzureCluster")
 		os.Exit(1)
 	}
+
+	kubeadmControlPlaneReconciler, err := controllers.NewKubeadmControlPlaneReconciler(mgr.GetClient(), mcNamespacedName, &controllers.KubeadmControlPlaneReconcilerOptions{
+		AzureClusterGates: azureClusterGates,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to create new KubeadmControlPlaneReconciler")
+		os.Exit(1)
+	}
+	if err = kubeadmControlPlaneReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "KubeadmControlPlane")
+		os.Exit(1)
+	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -151,4 +168,27 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+type ConditionSliceVar []capi.ConditionType
+
+func (v ConditionSliceVar) String() string {
+	s := make([]string, len(v))
+	for i := range v {
+		s[i] = string(v[i])
+	}
+	return strings.Join(s, ",")
+}
+
+func (v *ConditionSliceVar) Set(arg string) error {
+	arg = strings.Trim(arg, ",")
+	t := make([]capi.ConditionType, 0)
+	for s := range strings.SplitSeq(arg, ",") {
+		if s == "" {
+			continue
+		}
+		t = append(t, capi.ConditionType(s))
+	}
+	*v = t
+	return nil
 }

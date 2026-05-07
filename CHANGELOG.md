@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking changes
+
+- Remove ingress private endpoint (`<wc>-to-<mc>-privatelink-privateendpoint`). Only the gateway private endpoint (`<wc>-to-<mc>-gateway-privateendpoint`) is now created.
+- Remove `--mc-ingress-ip-source` flag. The gateway private endpoint IP is now always written to the `azure-private-endpoint-operator.giantswarm.io/private-link-mc-ingress-ip` annotation.
+- Remove `operator.mcIngressIPSource` Helm value.
+
 ## [0.4.0] - 2026-04-24
 
 ### Added

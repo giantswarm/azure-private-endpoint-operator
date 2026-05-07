@@ -108,15 +108,6 @@
                 }
             }
         },
-        "operator": {
-            "type": "object",
-            "properties": {
-                "mcIngressIPSource": {
-                    "type": "string",
-                    "enum": ["ingress", "gateway"]
-                }
-            }
-        },
         "serviceType": {
             "type": "string"
         }

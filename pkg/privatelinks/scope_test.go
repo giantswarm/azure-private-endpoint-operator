@@ -42,7 +42,7 @@ var _ = Describe("Scope", func() {
 
 		When("AzureCluster is not set", func() {
 			It("returns an invalid config error", func() {
-				_, err := privatelinks.NewScope(nil, client, "")
+				_, err := privatelinks.NewScope(nil, client)
 				Expect(err).To(HaveOccurred())
 				Expect(errors.IsInvalidConfig(err)).To(BeTrue())
 			})
@@ -50,7 +50,7 @@ var _ = Describe("Scope", func() {
 
 		When("kubernetes client is not set", func() {
 			It("returns an invalid config error", func() {
-				_, err := privatelinks.NewScope(azureCluster, nil, "")
+				_, err := privatelinks.NewScope(azureCluster, nil)
 				Expect(err).To(HaveOccurred())
 				Expect(errors.IsInvalidConfig(err)).To(BeTrue())
 			})
@@ -58,7 +58,7 @@ var _ = Describe("Scope", func() {
 
 		When("both AzureCluster and client are set", func() {
 			It("creates the scope", func() {
-				_, err := privatelinks.NewScope(azureCluster, client, "")
+				_, err := privatelinks.NewScope(azureCluster, client)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -79,7 +79,7 @@ var _ = Describe("Scope", func() {
 			client := fake.NewClientBuilder().
 				WithScheme(capzSchema).
 				WithObjects(azureCluster).Build()
-			scope, err = privatelinks.NewScope(azureCluster, client, "")
+			scope, err = privatelinks.NewScope(azureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -157,7 +157,7 @@ var _ = Describe("Scope", func() {
 			client := fake.NewClientBuilder().
 				WithScheme(capzSchema).
 				WithObjects(azureCluster).Build()
-			scope, err = privatelinks.NewScope(azureCluster, client, "")
+			scope, err = privatelinks.NewScope(azureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -223,7 +223,7 @@ var _ = Describe("Scope", func() {
 			client := fake.NewClientBuilder().
 				WithScheme(capzSchema).
 				WithObjects(azureCluster).Build()
-			scope, err = privatelinks.NewScope(azureCluster, client, "")
+			scope, err = privatelinks.NewScope(azureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -279,7 +279,7 @@ var _ = Describe("Scope", func() {
 			client := fake.NewClientBuilder().
 				WithScheme(capzSchema).
 				WithObjects(azureCluster).Build()
-			scope, err = privatelinks.NewScope(azureCluster, client, "")
+			scope, err = privatelinks.NewScope(azureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 		})
 

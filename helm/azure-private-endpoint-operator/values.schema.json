@@ -20,7 +20,7 @@
             "items": {
                 "enum": [
                   "GSPrivateLinksReady",
-                  "GSDNSZonesCreated"
+                  "GSDNSZoneReady"
                 ]
             }
         },

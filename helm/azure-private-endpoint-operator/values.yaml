@@ -38,4 +38,4 @@ azure:
 
 azureClusterGates:
   - GSPrivateLinksReady
-  - GSDNSZonesCreated
+  - GSDNSZoneReady

@@ -35,3 +35,7 @@ managementCluster:
 azure:
   workloadIdentity:
     clientID: ""
+
+azureClusterGates:
+  - GSPrivateLinksReady
+  - GSDNSZoneReady

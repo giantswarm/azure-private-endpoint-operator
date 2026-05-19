@@ -18,7 +18,10 @@
         "azureClusterGates": {
             "type": "array",
             "items": {
-                "enum": ["GSPrivateLinksReady"]
+                "enum": [
+                  "GSPrivateLinksReady",
+                  "GSDNSZoneReady"
+                ]
             }
         },
         "image": {

@@ -9,8 +9,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+	kcp "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	caputil "sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -38,7 +39,7 @@ var (
 )
 
 type KubeadmControlPlaneReconcilerOptions struct {
-	AzureClusterGates []capi.ConditionType
+	AzureClusterGates []capiv1beta1.ConditionType
 }
 
 func NewKubeadmControlPlaneReconciler(client client.Client, managmentCluster types.NamespacedName, opts *KubeadmControlPlaneReconcilerOptions) (*KubeadmControlPlaneReconciler, error) {
@@ -72,7 +73,7 @@ func NewKubeadmControlPlaneReconciler(client client.Client, managmentCluster typ
 type KubeadmControlPlaneReconciler struct {
 	client            client.Client
 	managementCluster types.NamespacedName
-	azureClusterGates []capi.ConditionType
+	azureClusterGates []capiv1beta1.ConditionType
 }
 
 // Reconcile KubeadmControlPlane to ensure that its associated InfraCluster has passed
@@ -107,7 +108,7 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 		return
 	}
 
-	kcp := new(v1beta1.KubeadmControlPlane)
+	kcp := new(kcp.KubeadmControlPlane)
 	err = r.client.Get(ctx, req.NamespacedName, kcp)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -140,7 +141,7 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	infraCluster := new(capz.AzureCluster)
 	err = r.client.Get(ctx, types.NamespacedName{
-		Namespace: cluster.Spec.InfrastructureRef.Namespace,
+		Namespace: req.Namespace,
 		Name:      cluster.Spec.InfrastructureRef.Name,
 	}, infraCluster)
 	if err != nil {
@@ -183,8 +184,9 @@ func (r *KubeadmControlPlaneReconciler) PreflightCheckManagementCluster(ctx cont
 }
 
 // PreflightCheckControlPlane asserts that it is safe to proceed reconciling the KubeamControlPlane.
-func (r *KubeadmControlPlaneReconciler) PreflightCheckControlPlane(ctx context.Context, kcp *v1beta1.KubeadmControlPlane) error {
-	if kcp.Status.Ready {
+func (r *KubeadmControlPlaneReconciler) PreflightCheckControlPlane(ctx context.Context, kcp *kcp.KubeadmControlPlane) error {
+	if kcp.Status.Initialization.ControlPlaneInitialized != nil &&
+		*kcp.Status.Initialization.ControlPlaneInitialized {
 		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonControlPlaneProvisioned)
 	}
 
@@ -204,11 +206,12 @@ func (r *KubeadmControlPlaneReconciler) PreflightCheckControlPlane(ctx context.C
 
 func (r *KubeadmControlPlaneReconciler) PreflightCheckCluster(ctx context.Context, cluster *capi.Cluster) error {
 	// If the Cluster is paused, then we should not, in any circumstance, unpause the control plane.
-	if cluster.Spec.Paused {
+	if cluster.Spec.Paused != nil &&
+		*cluster.Spec.Paused {
 		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonClusterPaused)
 	}
 
-	if cluster.Spec.InfrastructureRef == nil {
+	if !cluster.Spec.InfrastructureRef.IsDefined() {
 		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonInfraClusterMissing)
 	}
 
@@ -234,7 +237,7 @@ func (r *KubeadmControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1beta1.KubeadmControlPlane{}).
+		For(&kcp.KubeadmControlPlane{}).
 		Watches(&capz.AzureCluster{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, ac client.Object) []reconcile.Request {
 			logger := mgr.GetLogger()
 
@@ -249,7 +252,7 @@ func (r *KubeadmControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error
 				return nil
 			}
 
-			if cluster.Spec.ControlPlaneRef == nil {
+			if !cluster.Spec.ControlPlaneRef.IsDefined() {
 				return nil
 			}
 

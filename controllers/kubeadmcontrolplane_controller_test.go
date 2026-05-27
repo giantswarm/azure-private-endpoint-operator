@@ -10,8 +10,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+	kcp "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -24,7 +25,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 
 	BeforeEach(func() {
 		scheme = runtime.NewScheme()
-		utilruntime.Must(kcpv1.AddToScheme(scheme))
+		utilruntime.Must(kcp.AddToScheme(scheme))
 		utilruntime.Must(capi.AddToScheme(scheme))
 		utilruntime.Must(capz.AddToScheme(scheme))
 	})
@@ -168,7 +169,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				Build()
 
 			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, mcName, &controllers.KubeadmControlPlaneReconcilerOptions{
-				AzureClusterGates: []capi.ConditionType{"NotMet"},
+				AzureClusterGates: []capiv1beta1.ConditionType{"NotMet"},
 			})
 			Expect(err).ShouldNot(HaveOccurred())
 
@@ -184,7 +185,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 
 		It("unpauses the control plane when all conditions are met", func(ctx context.Context) {
 			name, namespace := "test", "org-giantswarm"
-			condition := capi.Condition{
+			condition := capiv1beta1.Condition{
 				Type:   "YesMet",
 				Status: corev1.ConditionTrue,
 			}
@@ -208,7 +209,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				Build()
 
 			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, mcName, &controllers.KubeadmControlPlaneReconcilerOptions{
-				AzureClusterGates: []capi.ConditionType{condition.Type},
+				AzureClusterGates: []capiv1beta1.ConditionType{condition.Type},
 			})
 			Expect(err).ShouldNot(HaveOccurred())
 

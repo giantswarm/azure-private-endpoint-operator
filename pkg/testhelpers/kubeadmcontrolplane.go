@@ -4,13 +4,13 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+	kcp "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func NewKubeadmControlPlaneBuilder(namespace, name string) *KubeadmControlPlaneBuilder {
 	b := &KubeadmControlPlaneBuilder{
-		o: new(kcpv1.KubeadmControlPlane),
+		o: new(kcp.KubeadmControlPlane),
 	}
 
 	b.o.SetNamespace(namespace)
@@ -20,7 +20,7 @@ func NewKubeadmControlPlaneBuilder(namespace, name string) *KubeadmControlPlaneB
 }
 
 type KubeadmControlPlaneBuilder struct {
-	o *kcpv1.KubeadmControlPlane
+	o *kcp.KubeadmControlPlane
 }
 
 func (b *KubeadmControlPlaneBuilder) WithPause() *KubeadmControlPlaneBuilder {
@@ -28,7 +28,7 @@ func (b *KubeadmControlPlaneBuilder) WithPause() *KubeadmControlPlaneBuilder {
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
-	annotations[clusterv1.PausedAnnotation] = "true"
+	annotations[capi.PausedAnnotation] = "true"
 	b.o.SetAnnotations(annotations)
 	return b
 }
@@ -41,10 +41,10 @@ func (b *KubeadmControlPlaneBuilder) WithDeletionTimestamp() *KubeadmControlPlan
 }
 
 func (b *KubeadmControlPlaneBuilder) WithStatusProvisioned() *KubeadmControlPlaneBuilder {
-	b.o.Status.Ready = true
+	b.o.Status.Initialization.ControlPlaneInitialized = new(true)
 	return b
 }
 
-func (b *KubeadmControlPlaneBuilder) Build() *kcpv1.KubeadmControlPlane {
+func (b *KubeadmControlPlaneBuilder) Build() *kcp.KubeadmControlPlane {
 	return b.o
 }

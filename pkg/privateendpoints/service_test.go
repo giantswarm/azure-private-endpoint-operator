@@ -7,8 +7,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure/mock_azure"
@@ -35,12 +37,15 @@ var _ = Describe("Service", func() {
 	var privateLinksScope privateendpoints.PrivateLinksScope
 	var privateEndpointsScope privateendpoints.Scope
 	var service *privateendpoints.Service
+	var scheme *runtime.Scheme
 
 	BeforeEach(func() {
 		subscriptionID = "1234"
 		location = "westeurope"
 		mcResourceGroup = "test-mc-rg"
 		wcResourceGroup = "test-wc-rg"
+		scheme = runtime.NewScheme()
+		Expect(capz.AddToScheme(scheme)).To(Succeed())
 	})
 
 	When("there is no private link where MC subscription is allowed", func() {
@@ -61,10 +66,8 @@ var _ = Describe("Service", func() {
 				Build()
 
 			// Kubernetes client
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(managementAzureCluster, workloadAzureCluster).
 				Build()
 
@@ -77,7 +80,7 @@ var _ = Describe("Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private links scope
-			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client)
+			privateLinksScope, err := privatelinks.NewScope(workloadAzureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private endpoints service
@@ -108,10 +111,8 @@ var _ = Describe("Service", func() {
 				Build()
 
 			// Kubernetes client
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(managementAzureCluster, workloadAzureCluster).
 				Build()
 
@@ -156,14 +157,15 @@ var _ = Describe("Service", func() {
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				Build()
 
 			// Kubernetes client
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(managementAzureCluster, workloadAzureCluster).
 				Build()
 
@@ -258,14 +260,15 @@ var _ = Describe("Service", func() {
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				Build()
 
 			// Kubernetes client
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(managementAzureCluster, workloadAzureCluster).
 				Build()
 
@@ -335,14 +338,15 @@ var _ = Describe("Service", func() {
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				Build()
 
 			// Kubernetes client
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(managementAzureCluster, workloadAzureCluster).
 				Build()
 
@@ -412,14 +416,15 @@ var _ = Describe("Service", func() {
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				Build()
 
 			// Kubernetes client
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(managementAzureCluster, workloadAzureCluster).
 				Build()
 

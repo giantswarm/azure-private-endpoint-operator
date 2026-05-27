@@ -13,6 +13,8 @@ import (
 )
 
 type BaseScope struct {
+	v1beta1conditions.Getter
+
 	azureCluster *capz.AzureCluster
 	patchHelper  *patch.Helper
 }
@@ -67,6 +69,10 @@ func (s *BaseScope) SetAnnotation(annotation, value string) {
 	}
 	annotations[annotation] = value
 	s.azureCluster.SetAnnotations(annotations)
+}
+
+func (s *BaseScope) GetConditions() capi.Conditions {
+	return s.azureCluster.GetConditions()
 }
 
 func (s *BaseScope) SetCondition(condition capi.Condition) {

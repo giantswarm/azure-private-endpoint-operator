@@ -1,6 +1,7 @@
 package controllers_test
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -8,7 +9,9 @@ import (
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/tools/go/packages"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,7 +27,9 @@ func TestControllers(t *testing.T) {
 }
 
 var (
-	testEnv *envtest.Environment
+	testEnv   *envtest.Environment
+	k8sClient client.Client
+	namespace string
 )
 
 var _ = BeforeSuite(func() {
@@ -65,7 +70,7 @@ var _ = BeforeSuite(func() {
 	Expect(capi.AddToScheme(scheme.Scheme)).Should(Succeed())
 	Expect(capz.AddToScheme(scheme.Scheme)).Should(Succeed())
 
-	k8sClient, err := client.New(cfg, client.Options{})
+	k8sClient, err = client.New(cfg, client.Options{})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
@@ -79,4 +84,17 @@ var _ = AfterSuite(func() {
 	}
 
 	Expect(testEnv.Stop()).Should(Succeed())
+})
+
+var _ = BeforeEach(func() {
+	namespace = string(uuid.NewUUID())
+	namespaceObj := corev1.Namespace{}
+	namespaceObj.Name = namespace
+	Expect(k8sClient.Create(context.Background(), &namespaceObj)).To(Succeed())
+})
+
+var _ = AfterEach(func() {
+	namespaceObj := corev1.Namespace{}
+	namespaceObj.Name = namespace
+	Expect(k8sClient.Delete(context.Background(), &namespaceObj)).To(Succeed())
 })

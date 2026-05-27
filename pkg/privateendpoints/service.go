@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	"sigs.k8s.io/cluster-api-provider-azure/util/slice"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/giantswarm/microerror"
@@ -84,7 +84,7 @@ func (s *Service) ReconcileMcToWcApi(ctx context.Context) error {
 	//
 	for _, privateLink := range privateLinks {
 		logger.Info(fmt.Sprintf("Found private link %s", privateLink.Name))
-		manualApproval := !slice.Contains(util.ConvertToStringSlice(privateLink.AutoApprovedSubscriptions), s.privateEndpointsScope.GetSubscriptionID())
+		manualApproval := !slices.Contains(util.ConvertToStringSlice(privateLink.AutoApprovedSubscriptions), s.privateEndpointsScope.GetSubscriptionID())
 		var requestMessage string
 		if manualApproval {
 			requestMessage = fmt.Sprintf("Giant Swarm azure-private-endpoint-operator that is running in "+

@@ -4,23 +4,23 @@ import (
 	"fmt"
 
 	"github.com/onsi/gomega/types"
-	"sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
 )
 
 // MeetConditions is a Gomega matcher that wraps around [util.AreStatusConditionsMet].
-func MeetConditions(gates ...v1beta1.ConditionType) types.GomegaMatcher {
+func MeetConditions(gates ...capi.ConditionType) types.GomegaMatcher {
 	return &matchStatusCondition{gates: gates}
 }
 
 type matchStatusCondition struct {
-	gates []v1beta1.ConditionType
-	unmet []v1beta1.ConditionType
+	gates []capi.ConditionType
+	unmet []capi.ConditionType
 }
 
 func (m *matchStatusCondition) Match(actual any) (success bool, err error) {
-	conditions, ok := actual.(v1beta1.Conditions)
+	conditions, ok := actual.(capi.Conditions)
 	if !ok {
 		return false, fmt.Errorf("actual should be of type v1beta1.Conditions")
 	}

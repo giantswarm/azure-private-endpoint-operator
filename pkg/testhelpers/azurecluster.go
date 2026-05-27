@@ -5,7 +5,7 @@ import (
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
 )
 
 type AzureClusterBuilder struct {
@@ -85,7 +85,7 @@ func (b *AzureClusterBuilder) Build() *capz.AzureCluster {
 				Location:       b.location,
 			},
 			NetworkSpec: capz.NetworkSpec{
-				APIServerLB: b.apiServerLB,
+				APIServerLB: &b.apiServerLB,
 				Subnets:     b.subnets,
 			},
 		},

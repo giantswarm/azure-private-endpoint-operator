@@ -5,9 +5,10 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -21,10 +22,13 @@ var linkName = "test-private-link"
 var _ = Describe("Scope", func() {
 	var subscriptionID string
 	var resourceGroup string
+	var scheme *runtime.Scheme
 
 	BeforeEach(func() {
 		subscriptionID = "1234"
 		resourceGroup = "test-rg"
+		scheme = runtime.NewScheme()
+		Expect(capz.AddToScheme(scheme)).To(Succeed())
 	})
 
 	Describe("creating scope", func() {
@@ -33,10 +37,8 @@ var _ = Describe("Scope", func() {
 
 		BeforeEach(func() {
 			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).Build()
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client = fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(azureCluster).Build()
 		})
 
@@ -74,11 +76,10 @@ var _ = Describe("Scope", func() {
 				azureClusterBuilder.WithPrivateLink(testhelpers.NewPrivateLinkBuilder(*privateLinkName).Build())
 			}
 			azureCluster := azureClusterBuilder.Build()
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(azureCluster).Build()
+			var err error
 			scope, err = privatelinks.NewScope(azureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -152,11 +153,10 @@ var _ = Describe("Scope", func() {
 				azureClusterBuilder.WithPrivateLink(privateLink)
 			}
 			azureCluster := azureClusterBuilder.Build()
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(azureCluster).Build()
+			var err error
 			scope, err = privatelinks.NewScope(azureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -218,18 +218,20 @@ var _ = Describe("Scope", func() {
 				WithCondition(privateLinksCondition).
 				Build()
 
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(azureCluster).Build()
+			var err error
 			scope, err = privatelinks.NewScope(azureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		When("PrivateLinksReady condition has status True", func() {
 			BeforeEach(func() {
-				privateLinksCondition = conditions.TrueCondition(capz.PrivateLinksReadyCondition)
+				privateLinksCondition = &capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}
 			})
 			It("scope.PrivateLinksReady returns true", func() {
 				privateLinksReady := scope.PrivateLinksReady()
@@ -239,7 +241,11 @@ var _ = Describe("Scope", func() {
 
 		When("PrivateLinksReady condition has status False", func() {
 			BeforeEach(func() {
-				privateLinksCondition = conditions.FalseCondition(capz.PrivateLinksReadyCondition, "Something", capi.ConditionSeverityError, "some error")
+				privateLinksCondition = &capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionFalse,
+					// Severity: capi.ConditionSeverityError,
+				}
 			})
 			It("scope.PrivateLinksReady returns false", func() {
 				privateLinksReady := scope.PrivateLinksReady()
@@ -249,7 +255,10 @@ var _ = Describe("Scope", func() {
 
 		When("PrivateLinksReady condition has status Unknown", func() {
 			BeforeEach(func() {
-				privateLinksCondition = conditions.UnknownCondition(capz.PrivateLinksReadyCondition, "Something", "some error")
+				privateLinksCondition = &capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionUnknown,
+				}
 			})
 			It("scope.PrivateLinksReady returns false", func() {
 				privateLinksReady := scope.PrivateLinksReady()
@@ -274,11 +283,10 @@ var _ = Describe("Scope", func() {
 
 		BeforeEach(func() {
 			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).Build()
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(azureCluster).Build()
+			var err error
 			scope, err = privatelinks.NewScope(azureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 		})

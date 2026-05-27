@@ -8,10 +8,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -45,6 +47,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 	var k8sClient client.Client
 	var privateEndpointsClientCreator azure.PrivateEndpointsClientCreator
 	var reconciler *controllers.AzureClusterReconciler
+	var scheme *runtime.Scheme
 
 	BeforeEach(func() {
 		subscriptionID = "1234"
@@ -74,8 +77,8 @@ var _ = Describe("AzureClusterReconciler", func() {
 	})
 
 	JustBeforeEach(func() {
-		capzSchema, err := capz.SchemeBuilder.Build()
-		Expect(err).NotTo(HaveOccurred())
+		scheme = runtime.NewScheme()
+		Expect(capz.AddToScheme(scheme)).To(Succeed())
 
 		var objects []client.Object
 		if managementAzureCluster != nil {
@@ -85,7 +88,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 			objects = append(objects, workloadAzureCluster)
 		}
 		k8sClientBuilder := fake.NewClientBuilder().
-			WithScheme(capzSchema).
+			WithScheme(scheme).
 			WithStatusSubresource(&capz.AzureCluster{})
 		if len(objects) > 0 {
 			k8sClientBuilder.WithObjects(objects...)
@@ -254,7 +257,10 @@ var _ = Describe("AzureClusterReconciler", func() {
 					WithAllowedSubscription(subscriptionID).
 					WithAutoApprovedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
@@ -370,7 +376,10 @@ var _ = Describe("AzureClusterReconciler", func() {
 					WithAllowedSubscription(subscriptionID).
 					WithAutoApprovedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
@@ -479,7 +488,10 @@ var _ = Describe("AzureClusterReconciler", func() {
 					WithAllowedSubscription(subscriptionID).
 					WithAutoApprovedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				WithFinalizer(controllers.AzureClusterControllerFinalizer).
 				WithDeletionTimestamp(time.Now()).
 				Build()
@@ -571,7 +583,10 @@ var _ = Describe("AzureClusterReconciler", func() {
 						WithAllowedSubscription(subscriptionID).
 						WithAutoApprovedSubscription(subscriptionID).
 						Build()).
-					WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+					WithCondition(&capi.Condition{
+						Type:   capz.PrivateLinksReadyCondition,
+						Status: corev1.ConditionTrue,
+					}).
 					Build()
 
 				privateEndpointsClientCreator = func(_ context.Context, _ client.Client, cluster *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
@@ -611,7 +626,10 @@ var _ = Describe("AzureClusterReconciler", func() {
 						WithAllowedSubscription(subscriptionID).
 						WithAutoApprovedSubscription(subscriptionID).
 						Build()).
-					WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+					WithCondition(&capi.Condition{
+						Type:   capz.PrivateLinksReadyCondition,
+						Status: corev1.ConditionTrue,
+					}).
 					Build()
 
 				privateEndpointsClientCreator = func(_ context.Context, _ client.Client, cluster *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
@@ -652,7 +670,10 @@ var _ = Describe("AzureClusterReconciler", func() {
 						WithAllowedSubscription(subscriptionID).
 						WithAutoApprovedSubscription(subscriptionID).
 						Build()).
-					WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+					WithCondition(&capi.Condition{
+						Type:   capz.PrivateLinksReadyCondition,
+						Status: corev1.ConditionTrue,
+					}).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					Build()
 
@@ -694,7 +715,10 @@ var _ = Describe("AzureClusterReconciler", func() {
 						WithAllowedSubscription(subscriptionID).
 						WithAutoApprovedSubscription(subscriptionID).
 						Build()).
-					WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+					WithCondition(&capi.Condition{
+						Type:   capz.PrivateLinksReadyCondition,
+						Status: corev1.ConditionTrue,
+					}).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					Build()
 

@@ -29,8 +29,9 @@ func (b *ClusterBuilder) WithControlPlane(kcp *kcp.KubeadmControlPlane) *Cluster
 	b.o.ObjectMeta.Namespace = kcp.Namespace
 	b.o.ObjectMeta.Name = kcp.Name
 	b.o.Spec.ControlPlaneRef = capi.ContractVersionedObjectReference{
-		Kind: kcp.Kind,
-		Name: kcp.Name,
+		APIGroup: capi.GroupVersionControlPlane.Group,
+		Kind:     kcp.Kind,
+		Name:     kcp.Name,
 	}
 	err := ctrl.SetControllerReference(b.o, kcp, b.scheme)
 	if err != nil {
@@ -43,8 +44,9 @@ func (b *ClusterBuilder) WithAzureCluster(ac *capz.AzureCluster) *ClusterBuilder
 	b.o.Namespace = ac.Namespace
 	b.o.Name = ac.Name
 	b.o.Spec.InfrastructureRef = capi.ContractVersionedObjectReference{
-		Kind: ac.Kind,
-		Name: ac.Name,
+		APIGroup: capi.GroupVersionInfrastructure.Group,
+		Kind:     ac.Kind,
+		Name:     ac.Name,
 	}
 	return b
 }

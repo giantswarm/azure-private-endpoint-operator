@@ -185,7 +185,8 @@ func (r *KubeadmControlPlaneReconciler) PreflightCheckManagementCluster(ctx cont
 
 // PreflightCheckControlPlane asserts that it is safe to proceed reconciling the KubeamControlPlane.
 func (r *KubeadmControlPlaneReconciler) PreflightCheckControlPlane(ctx context.Context, kcp *kcp.KubeadmControlPlane) error {
-	if *kcp.Status.Initialization.ControlPlaneInitialized {
+	if kcp.Status.Initialization.ControlPlaneInitialized != nil &&
+		*kcp.Status.Initialization.ControlPlaneInitialized {
 		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonControlPlaneProvisioned)
 	}
 
@@ -205,7 +206,8 @@ func (r *KubeadmControlPlaneReconciler) PreflightCheckControlPlane(ctx context.C
 
 func (r *KubeadmControlPlaneReconciler) PreflightCheckCluster(ctx context.Context, cluster *capi.Cluster) error {
 	// If the Cluster is paused, then we should not, in any circumstance, unpause the control plane.
-	if *cluster.Spec.Paused {
+	if cluster.Spec.Paused != nil &&
+		*cluster.Spec.Paused {
 		return fmt.Errorf("%w: %w", ErrReconcileCancelled, ErrReasonClusterPaused)
 	}
 

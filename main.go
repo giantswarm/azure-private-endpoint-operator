@@ -29,8 +29,9 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	kcp "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta1"
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	kcp "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -50,6 +51,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(capiv1beta1.AddToScheme(scheme))
 	utilruntime.Must(capi.AddToScheme(scheme))
 	utilruntime.Must(capz.AddToScheme(scheme))
 	utilruntime.Must(kcp.AddToScheme(scheme))
@@ -165,7 +167,7 @@ func main() {
 	}
 }
 
-type ConditionSliceVar []capi.ConditionType
+type ConditionSliceVar []capiv1beta1.ConditionType
 
 func (v ConditionSliceVar) String() string {
 	s := make([]string, len(v))
@@ -177,12 +179,12 @@ func (v ConditionSliceVar) String() string {
 
 func (v *ConditionSliceVar) Set(arg string) error {
 	arg = strings.Trim(arg, ",")
-	t := make([]capi.ConditionType, 0)
+	t := make([]capiv1beta1.ConditionType, 0)
 	for s := range strings.SplitSeq(arg, ",") {
 		if s == "" {
 			continue
 		}
-		t = append(t, capi.ConditionType(s))
+		t = append(t, capiv1beta1.ConditionType(s))
 	}
 	*v = t
 	return nil

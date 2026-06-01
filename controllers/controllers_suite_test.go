@@ -10,10 +10,12 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/tools/go/packages"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -30,6 +32,7 @@ var (
 	testEnv   *envtest.Environment
 	k8sClient client.Client
 	namespace string
+	scheme    = runtime.NewScheme()
 )
 
 var _ = BeforeSuite(func() {
@@ -51,7 +54,13 @@ var _ = BeforeSuite(func() {
 	kubeBuilderAssetsPath, err := envtest.SetupEnvtestDefaultBinaryAssetsDirectory()
 	Expect(err).NotTo(HaveOccurred())
 
+	Expect(clientgoscheme.AddToScheme(scheme)).Should(Succeed())
+	Expect(capi.AddToScheme(scheme)).Should(Succeed())
+	Expect(capiv1beta1.AddToScheme(scheme)).Should(Succeed())
+	Expect(capz.AddToScheme(scheme)).Should(Succeed())
+
 	testEnv = &envtest.Environment{
+		Scheme: scheme,
 		CRDDirectoryPaths: []string{
 			filepath.Join(capiModule[0].Module.Dir, "config", "crd", "bases"),
 			filepath.Join(capiModule[0].Module.Dir, "controlplane", "kubeadm", "config", "crd", "bases"),
@@ -60,17 +69,14 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 		BinaryAssetsDirectory: kubeBuilderAssetsPath,
 		DownloadBinaryAssets:  true,
-
-		Scheme: scheme.Scheme,
 	}
 
 	cfg, err := testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
 
-	Expect(capi.AddToScheme(scheme.Scheme)).Should(Succeed())
-	Expect(capz.AddToScheme(scheme.Scheme)).Should(Succeed())
-
-	k8sClient, err = client.New(cfg, client.Options{})
+	k8sClient, err = client.New(cfg, client.Options{
+		Scheme: scheme,
+	})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 

@@ -57,7 +57,9 @@ var _ = Describe("Scope", func() {
 		var client client.Client
 
 		BeforeEach(func() {
-			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
+			azureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", resourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(resourceGroup).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 			client = fake.NewClientBuilder().
@@ -107,7 +109,9 @@ var _ = Describe("Scope", func() {
 		var azureCluster *capz.AzureCluster
 
 		BeforeEach(func(ctx context.Context) {
-			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
+			azureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", resourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(resourceGroup).
 				WithSubnet("test-subnet", capz.SubnetNode, fakePrivateEndpoints(subscriptionID, resourceGroup, privateEndpointNames)).
 				Build()
 			client := fake.NewClientBuilder().
@@ -183,7 +187,9 @@ var _ = Describe("Scope", func() {
 		var azureCluster *capz.AzureCluster
 
 		BeforeEach(func(ctx context.Context) {
-			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
+			azureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", resourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(resourceGroup).
 				WithSubnet("test-subnet", capz.SubnetNode, fakePrivateEndpoints(subscriptionID, resourceGroup, privateEndpointNames)).
 				Build()
 			client := fake.NewClientBuilder().
@@ -323,7 +329,9 @@ var _ = Describe("Scope", func() {
 		var azureCluster *capz.AzureCluster
 
 		BeforeEach(func(ctx context.Context) {
-			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
+			azureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", resourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(resourceGroup).
 				WithSubnet("test-subnet", capz.SubnetNode, fakePrivateEndpoints(subscriptionID, resourceGroup, privateEndpointNames)).
 				Build()
 			client := fake.NewClientBuilder().

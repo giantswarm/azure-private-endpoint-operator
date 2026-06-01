@@ -36,7 +36,10 @@ var _ = Describe("Scope", func() {
 		var client client.Client
 
 		BeforeEach(func() {
-			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).Build()
+			azureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", resourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(resourceGroup).
+				Build()
 			client = fake.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(azureCluster).Build()
@@ -71,7 +74,10 @@ var _ = Describe("Scope", func() {
 		var scope *privatelinks.Scope
 
 		JustBeforeEach(func() {
-			azureClusterBuilder := testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup)
+			azureClusterBuilder := testhelpers.NewAzureClusterBuilder("org-giantswarm", resourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(resourceGroup)
+
 			for _, privateLinkName := range privateLinkNames {
 				azureClusterBuilder.WithPrivateLink(testhelpers.NewPrivateLinkBuilder(*privateLinkName).Build())
 			}
@@ -143,7 +149,10 @@ var _ = Describe("Scope", func() {
 		var scope *privatelinks.Scope
 
 		JustBeforeEach(func() {
-			azureClusterBuilder := testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup)
+			azureClusterBuilder := testhelpers.NewAzureClusterBuilder("org-giantswarm", resourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(resourceGroup)
+
 			for privateLinkName, allowedSubscriptions := range privateLinksWithAllowedSubscriptions {
 				privateLinkBuilder := testhelpers.NewPrivateLinkBuilder(privateLinkName)
 				for _, allowedSubscription := range allowedSubscriptions {
@@ -213,7 +222,9 @@ var _ = Describe("Scope", func() {
 		var scope *privatelinks.Scope
 
 		JustBeforeEach(func() {
-			azureCluster := testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
+			azureCluster := testhelpers.NewAzureClusterBuilder("org-giantswarm", resourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(resourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder("test-private-link").Build()).
 				WithCondition(privateLinksCondition).
 				Build()
@@ -282,10 +293,15 @@ var _ = Describe("Scope", func() {
 		var scope *privatelinks.Scope
 
 		BeforeEach(func() {
-			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).Build()
+			azureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", resourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(resourceGroup).
+				Build()
+
 			client := fake.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(azureCluster).Build()
+
 			var err error
 			scope, err = privatelinks.NewScope(azureCluster, client)
 			Expect(err).NotTo(HaveOccurred())

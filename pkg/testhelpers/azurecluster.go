@@ -9,6 +9,7 @@ import (
 )
 
 type AzureClusterBuilder struct {
+	namespace, name   string
 	deletionTimestamp *meta.Time
 	finalizers        []string
 	subscriptionID    string
@@ -19,11 +20,21 @@ type AzureClusterBuilder struct {
 	conditions        capi.Conditions
 }
 
-func NewAzureClusterBuilder(subscriptionID, resourceGroup string) *AzureClusterBuilder {
+func NewAzureClusterBuilder(namespace, name string) *AzureClusterBuilder {
 	return &AzureClusterBuilder{
-		subscriptionID: subscriptionID,
-		resourceGroup:  resourceGroup,
+		namespace: namespace,
+		name:      name,
 	}
+}
+
+func (b *AzureClusterBuilder) WithResourceGroup(resourceGroup string) *AzureClusterBuilder {
+	b.resourceGroup = resourceGroup
+	return b
+}
+
+func (b *AzureClusterBuilder) WithSubscriptionID(subscriptionID string) *AzureClusterBuilder {
+	b.subscriptionID = subscriptionID
+	return b
 }
 
 func (b *AzureClusterBuilder) WithLocation(location string) *AzureClusterBuilder {
@@ -73,8 +84,8 @@ func (b *AzureClusterBuilder) WithCondition(condition *capi.Condition) *AzureClu
 func (b *AzureClusterBuilder) Build() *capz.AzureCluster {
 	azureCluster := capz.AzureCluster{
 		ObjectMeta: meta.ObjectMeta{
-			Name:              b.resourceGroup,
-			Namespace:         "org-giantswarm",
+			Namespace:         b.namespace,
+			Name:              b.name,
 			Finalizers:        b.finalizers,
 			DeletionTimestamp: b.deletionTimestamp,
 		},

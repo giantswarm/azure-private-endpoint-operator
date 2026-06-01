@@ -151,12 +151,14 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 	Describe("Reconciliation", func() {
 		It("pauses the control plane when infracluster status conditions are unmet", func(ctx context.Context) {
 			name, namespace := "test", "org-giantswarm"
-			mcInfraCluster := NewAzureClusterBuilder("", "management-cluster").
+			mcInfraCluster := NewAzureClusterBuilder("org-giantswarm", "management-cluster").
+				WithResourceGroup("management-cluster").
 				WithAPILoadBalancerType(capz.Internal).
 				Build()
 			mcName := types.NamespacedName{Namespace: mcInfraCluster.Namespace, Name: mcInfraCluster.Name}
 			kcp := NewKubeadmControlPlaneBuilder(namespace, name).Build()
-			infraCluster := NewAzureClusterBuilder("", name).
+			infraCluster := NewAzureClusterBuilder("org-giantswarm", name).
+				WithResourceGroup(name).
 				Build()
 			cluster := NewClusterBuilder(scheme).
 				WithControlPlane(kcp).
@@ -189,12 +191,14 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				Type:   "YesMet",
 				Status: corev1.ConditionTrue,
 			}
-			mcInfraCluster := NewAzureClusterBuilder("", "management-cluster").
+			mcInfraCluster := NewAzureClusterBuilder("org-giantswarm", "management-cluster").
+				WithResourceGroup("management-cluster").
 				WithAPILoadBalancerType(capz.Internal).
 				Build()
 			mcName := types.NamespacedName{Namespace: mcInfraCluster.Namespace, Name: mcInfraCluster.Name}
 			kcp := NewKubeadmControlPlaneBuilder(namespace, name).WithPause().Build()
-			infraCluster := NewAzureClusterBuilder("", name).
+			infraCluster := NewAzureClusterBuilder("org-giantswarm", name).
+				WithResourceGroup(name).
 				WithAPILoadBalancerType(capz.Internal).
 				WithCondition(&condition).
 				Build()

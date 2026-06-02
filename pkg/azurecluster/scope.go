@@ -6,13 +6,15 @@ import (
 	"github.com/giantswarm/microerror"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	v1beta1conditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions"
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type BaseScope struct {
+	v1beta1conditions.Getter
+
 	azureCluster *capz.AzureCluster
 	patchHelper  *patch.Helper
 }
@@ -57,7 +59,7 @@ func (s *BaseScope) PatchObject(ctx context.Context) error {
 }
 
 func (s *BaseScope) IsConditionTrue(conditionType capi.ConditionType) bool {
-	return conditions.IsTrue(s.azureCluster, conditionType)
+	return v1beta1conditions.IsTrue(s.azureCluster, conditionType)
 }
 
 func (s *BaseScope) SetAnnotation(annotation, value string) {
@@ -67,6 +69,10 @@ func (s *BaseScope) SetAnnotation(annotation, value string) {
 	}
 	annotations[annotation] = value
 	s.azureCluster.SetAnnotations(annotations)
+}
+
+func (s *BaseScope) GetConditions() capi.Conditions {
+	return s.azureCluster.GetConditions()
 }
 
 func (s *BaseScope) SetCondition(condition capi.Condition) {

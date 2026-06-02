@@ -12,6 +12,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
+	"k8s.io/apimachinery/pkg/runtime"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -35,6 +36,7 @@ var _ = Describe("Scope", func() {
 	var scope privateendpoints.Scope
 	var privateEndpointNames []string
 	var privateEndpointsCount int
+	var scheme *runtime.Scheme
 
 	BeforeEach(func() {
 		subscriptionID = "1234"
@@ -46,6 +48,8 @@ var _ = Describe("Scope", func() {
 			"test-private-endpoint-2",
 		}
 		privateEndpointsCount = len(privateEndpointNames)
+		scheme = runtime.NewScheme()
+		Expect(capz.AddToScheme(scheme)).To(Succeed())
 	})
 
 	Describe("creating scope", func() {
@@ -56,10 +60,8 @@ var _ = Describe("Scope", func() {
 			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client = fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(azureCluster).Build()
 			privateEndpointClient = mock_azure.NewMockPrivateEndpointsClient(gomockController)
 		})
@@ -108,12 +110,11 @@ var _ = Describe("Scope", func() {
 			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
 				WithSubnet("test-subnet", capz.SubnetNode, fakePrivateEndpoints(subscriptionID, resourceGroup, privateEndpointNames)).
 				Build()
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(azureCluster).Build()
 			privateEndpointClient = mock_azure.NewMockPrivateEndpointsClient(gomockController)
+			var err error
 			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, privateEndpointClient)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -185,12 +186,11 @@ var _ = Describe("Scope", func() {
 			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
 				WithSubnet("test-subnet", capz.SubnetNode, fakePrivateEndpoints(subscriptionID, resourceGroup, privateEndpointNames)).
 				Build()
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(azureCluster).Build()
 			privateEndpointClient = mock_azure.NewMockPrivateEndpointsClient(gomockController)
+			var err error
 			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, privateEndpointClient)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -326,12 +326,11 @@ var _ = Describe("Scope", func() {
 			azureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, resourceGroup).
 				WithSubnet("test-subnet", capz.SubnetNode, fakePrivateEndpoints(subscriptionID, resourceGroup, privateEndpointNames)).
 				Build()
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(azureCluster).Build()
 			privateEndpointClient := mock_azure.NewMockPrivateEndpointsClient(gomockController)
+			var err error
 			scope, err = privateendpoints.NewScope(ctx, azureCluster, client, privateEndpointClient)
 			Expect(err).NotTo(HaveOccurred())
 		})

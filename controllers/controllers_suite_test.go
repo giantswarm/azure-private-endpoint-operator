@@ -62,9 +62,14 @@ var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		Scheme: scheme,
 		CRDDirectoryPaths: []string{
+			// CAPI Core (Cluster, ...)
 			filepath.Join(capiModule[0].Module.Dir, "config", "crd", "bases"),
+			// CAPI ControlPlane (KubeadmControlPlane, ...)
 			filepath.Join(capiModule[0].Module.Dir, "controlplane", "kubeadm", "config", "crd", "bases"),
+			// CAPZ Core (AzureCluster, ...)
 			filepath.Join(capzModule[0].Module.Dir, "config", "crd", "bases"),
+			// Additional CRDs that we depend on (Crossplane, ...)
+			filepath.Join("..", "tests", "testdata", "crds"),
 		},
 		ErrorIfCRDPathMissing: true,
 		BinaryAssetsDirectory: kubeBuilderAssetsPath,

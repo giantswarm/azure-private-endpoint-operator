@@ -152,7 +152,11 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 	if err != nil {
 		return result, err
 	}
-	defer helper.Patch(ctx, kcp)
+	defer func() {
+		if err := helper.Patch(ctx, kcp); err != nil {
+			logger.Error(err, "failed to patch KubeadmControlPlane")
+		}
+	}()
 
 	unmet := util.FindUnmetStatusConditions(infraCluster.Status.Conditions, r.azureClusterGates)
 	if len(unmet) != 0 {

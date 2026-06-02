@@ -1,0 +1,19 @@
+version: "2"
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/giantswarm/azure-private-endpoint-operator
+linters:
+  exclusions:
+    rules:
+      # CAPZ depends on CAPI v1beta1 until it adopts v1beta2.
+      - text: 'SA1019: "sigs.k8s.io/cluster-api/api/core/v1beta1" is deprecated'
+        linters:
+          - staticcheck
+      # Similarly, CAPZ uses CAPI conditions until it adopts v1beta2.
+      - text: 'SA1019: "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions" is deprecated'
+        linters:
+          - staticcheck

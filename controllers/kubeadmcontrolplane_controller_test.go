@@ -166,7 +166,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 			request := Request(namespace, name)
 			result, err := reconciler.Reconcile(ctx, request)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(result.Requeue).Should(BeFalse())
+			Expect(result.RequeueAfter).Should(BeZero())
 
 			err = client.Get(ctx, request.NamespacedName, kcp)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -208,7 +208,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 			request := Request(namespace, name)
 			result, err := reconciler.Reconcile(ctx, request)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(result.Requeue).Should(BeFalse())
+			Expect(result.RequeueAfter).Should(BeZero())
 
 			err = client.Get(ctx, request.NamespacedName, kcp)
 			Expect(err).ShouldNot(HaveOccurred())

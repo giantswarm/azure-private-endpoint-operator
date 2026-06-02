@@ -3,12 +3,12 @@ package controllers_test
 import (
 	"context"
 
-	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
-	. "github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+
+	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
+	. "github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 )
 
 var _ = Describe("CrossplaneProviderConfigReconciler", func() {
@@ -127,7 +127,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 			_, err = r.Reconcile(ctx, req)
 			Expect(err).To(BeNil())
 
-			Eventually(komega.Get(providerConfig)).ShouldNot(Succeed())
+			Eventually(Get(providerConfig)).ShouldNot(Succeed())
 		})
 	})
 })

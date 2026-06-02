@@ -149,6 +149,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	providerConfigReconciler, err := controllers.NewProviderConfigReconciler(mgr.GetClient())
+	if err != nil {
+		setupLog.Error(err, "unable to create new ProviderConfigReconciler")
+		os.Exit(1)
+	}
+	if err = providerConfigReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ProviderConfigReconciler")
+		os.Exit(1)
+	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

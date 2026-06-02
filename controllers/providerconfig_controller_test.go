@@ -37,7 +37,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 			azureCluster := NewAzureClusterBuilder(namespace, "foo").
 				WithIdentity(azureClusterIdentity).
 				Build()
-			cluster := NewClusterBuilder(scheme).WithAzureCluster(azureCluster).Build()
+			cluster := NewClusterBuilder(namespace, "foo").WithAzureCluster(azureCluster).Build()
 
 			want := controllers.NewProviderConfig(req.Name)
 			want.Object["spec"] = map[string]any{
@@ -71,7 +71,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 
 		It("returns error when identityRef is unset", func() {
 			azureCluster := NewAzureClusterBuilder(namespace, "foo").Build()
-			cluster := NewClusterBuilder(scheme).WithAzureCluster(azureCluster).Build()
+			cluster := NewClusterBuilder(namespace, "foo").WithAzureCluster(azureCluster).Build()
 
 			CreateObjects(ctx, k8sClient, azureCluster, cluster)
 

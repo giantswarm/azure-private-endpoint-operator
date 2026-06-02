@@ -36,7 +36,7 @@ func (b *KubeadmControlPlaneBuilder) WithPause() *KubeadmControlPlaneBuilder {
 func (b *KubeadmControlPlaneBuilder) WithDeletionTimestamp() *KubeadmControlPlaneBuilder {
 	// Generate a timestamp 10 seconds in the past.
 	time := metav1.NewTime(time.Now().Add(time.Duration(-10) * time.Second))
-	b.o.ObjectMeta.SetDeletionTimestamp(&time)
+	b.o.SetDeletionTimestamp(&time)
 	return b
 }
 

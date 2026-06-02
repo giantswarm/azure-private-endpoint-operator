@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap/zapcore"
@@ -14,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	kcp "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
 	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -57,7 +59,9 @@ var _ = BeforeSuite(func() {
 	Expect(clientgoscheme.AddToScheme(scheme)).Should(Succeed())
 	Expect(capi.AddToScheme(scheme)).Should(Succeed())
 	Expect(capiv1beta1.AddToScheme(scheme)).Should(Succeed())
+	Expect(kcp.AddToScheme(scheme)).Should(Succeed())
 	Expect(capz.AddToScheme(scheme)).Should(Succeed())
+	testhelpers.SetScheme(scheme)
 
 	testEnv = &envtest.Environment{
 		Scheme: scheme,

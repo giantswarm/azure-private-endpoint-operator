@@ -45,13 +45,19 @@ func (r *ProviderConfigReconciler) Reconcile(ctx context.Context, req reconcile.
 		return
 	}
 
+	return r.reconcileNormal(ctx, cluster)
+}
+
+func (r *ProviderConfigReconciler) reconcileNormal(ctx context.Context, cluster *capi.Cluster) (result reconcile.Result, err error) {
+	logger := log.FromContext(ctx)
+
 	var info identityInfo
 	identityRef := new(corev1.ObjectReference)
 	switch {
 	case cluster.Spec.ControlPlaneRef.Kind == capz.AzureManagedControlPlaneKind:
 		azureManagedControlPlane := new(capz.AzureManagedControlPlane)
 		name := types.NamespacedName{
-			Namespace: req.Namespace,
+			Namespace: cluster.Namespace,
 			Name:      cluster.Spec.ControlPlaneRef.Name,
 		}
 		err = r.client.Get(ctx, name, azureManagedControlPlane)
@@ -65,7 +71,7 @@ func (r *ProviderConfigReconciler) Reconcile(ctx context.Context, req reconcile.
 	case cluster.Spec.InfrastructureRef.Kind == capz.AzureClusterKind:
 		azureCluster := new(capz.AzureCluster)
 		name := types.NamespacedName{
-			Namespace: req.Namespace,
+			Namespace: cluster.Namespace,
 			Name:      cluster.Spec.InfrastructureRef.Name,
 		}
 		err = r.client.Get(ctx, name, azureCluster)
@@ -91,7 +97,7 @@ func (r *ProviderConfigReconciler) Reconcile(ctx context.Context, req reconcile.
 	case capz.AzureClusterIdentityKind:
 		identity := new(capz.AzureClusterIdentity)
 		name := types.NamespacedName{
-			Namespace: req.Namespace,
+			Namespace: cluster.Namespace,
 			Name:      identityRef.Name,
 		}
 		err = r.client.Get(ctx, name, identity)
@@ -115,7 +121,7 @@ func (r *ProviderConfigReconciler) Reconcile(ctx context.Context, req reconcile.
 		return
 	}
 
-	providerConfig := NewProviderConfig(req.Name)
+	providerConfig := NewProviderConfig(cluster.Name)
 	_, err = controllerutil.CreateOrPatch(ctx, r.client, providerConfig, func() error {
 		providerConfig.Object["spec"] = map[string]any{
 			"credentials": map[string]any{

@@ -17,6 +17,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const (
+	ProviderConfigControllerFinalizer = "azure.giantswarm.io/providerconfig"
+)
+
 var (
 	ErrIdentityRefUnset = errors.New("identity ref is not set")
 )
@@ -45,11 +49,22 @@ func (r *ProviderConfigReconciler) Reconcile(ctx context.Context, req reconcile.
 		return
 	}
 
+	if !cluster.DeletionTimestamp.IsZero() {
+		return r.reconcileDelete(ctx, cluster)
+	}
+
 	return r.reconcileNormal(ctx, cluster)
 }
 
 func (r *ProviderConfigReconciler) reconcileNormal(ctx context.Context, cluster *capi.Cluster) (result reconcile.Result, err error) {
 	logger := log.FromContext(ctx)
+
+	origCluster := cluster.DeepCopy()
+	if controllerutil.AddFinalizer(cluster, ProviderConfigControllerFinalizer) {
+		if err = r.client.Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
+			return
+		}
+	}
 
 	var info identityInfo
 	identityRef := new(corev1.ObjectReference)
@@ -133,6 +148,23 @@ func (r *ProviderConfigReconciler) reconcileNormal(ctx context.Context, cluster 
 		}
 		return nil
 	})
+
+	return
+}
+
+func (r *ProviderConfigReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster) (result reconcile.Result, err error) {
+	providerConfig := NewProviderConfig(cluster.Name)
+	err = r.client.Delete(ctx, providerConfig)
+	if err != nil {
+		return
+	}
+
+	origCluster := cluster.DeepCopy()
+	if controllerutil.RemoveFinalizer(cluster, ProviderConfigControllerFinalizer) {
+		if err = r.client.Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
+			return
+		}
+	}
 
 	return
 }

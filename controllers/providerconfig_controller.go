@@ -31,20 +31,6 @@ func NewProviderConfigReconciler(client client.Client) (*ProviderConfigReconcile
 	}, nil
 }
 
-// Looking at the generated ProviderConfig for the CAPZ MC, it uses the CAPZ assigned identity.
-// For the PoC, it makes sense to do the same for WCs.
-// Unfortunately, we don't create a separate identity for WCs either, so it's the same as the MC.
-//
-// The controller in CAPAGS reconciles on the Cluster object, and then uses the controlPlaneRef
-// to fetch the control plane. From there, it fetches details like AWS region, VPC ID, role arn.
-// It used to re-use the CAPA credentials, but a migration to its own static credentials is in-progress.
-//
-// The flow is as follows:
-//  1. Fetch the reconciling Cluster object.
-//  2. Fetch the Cluster's ControlPlane through the ref.
-//  3. Fetch the ControlPlane's identity through the ref.
-//  4. Extract information from the ref.
-//  5. Create the ProviderConfig from the extracted information.
 type ProviderConfigReconciler struct {
 	client client.Client
 }
@@ -129,15 +115,7 @@ func (r *ProviderConfigReconciler) Reconcile(ctx context.Context, req reconcile.
 		return
 	}
 
-	providerConfig := new(unstructured.Unstructured)
-	providerConfig.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "azure.upbound.io",
-		Version: "v1beta1",
-		Kind:    "ProviderConfig",
-	})
-	providerConfig.SetName(req.Name)
-	providerConfig.SetNamespace(req.Namespace)
-
+	providerConfig := NewProviderConfig(req.Name)
 	_, err = controllerutil.CreateOrPatch(ctx, r.client, providerConfig, func() error {
 		providerConfig.Object["spec"] = map[string]any{
 			"credentials": map[string]any{
@@ -164,4 +142,16 @@ type identityInfo struct {
 	TenantID       string
 	SubscriptionID string
 	ClientID       string
+}
+
+// NewProviderConfig returns an [unstructured.Unstructured] prepared for use as a ProviderConfig.
+func NewProviderConfig(name string) *unstructured.Unstructured {
+	providerConfig := new(unstructured.Unstructured)
+	providerConfig.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "azure.upbound.io",
+		Version: "v1beta1",
+		Kind:    "ProviderConfig",
+	})
+	providerConfig.SetName(name)
+	return providerConfig
 }

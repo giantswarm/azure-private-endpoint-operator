@@ -7,8 +7,6 @@ import (
 	. "github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -41,13 +39,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 				Build()
 			cluster := NewClusterBuilder(scheme).WithAzureCluster(azureCluster).Build()
 
-			want := new(unstructured.Unstructured)
-			want.SetGroupVersionKind(schema.GroupVersionKind{
-				Group:   "azure.upbound.io",
-				Version: "v1beta1",
-				Kind:    "ProviderConfig",
-			})
-			want.SetName(req.Name)
+			want := controllers.NewProviderConfig(req.Name)
 			want.Object["spec"] = map[string]any{
 				"credentials": map[string]any{
 					"source": "UserAssignedManagedIdentity",
@@ -65,18 +57,10 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 			_, err = r.Reconcile(context.Background(), req)
 			Expect(err).To(BeNil())
 
-			providerConfig := new(unstructured.Unstructured)
-			providerConfig.SetGroupVersionKind(schema.GroupVersionKind{
-				Group:   "azure.upbound.io",
-				Version: "v1beta1",
-				Kind:    "ProviderConfig",
-			})
-			providerConfig.SetName(req.Name)
-
-			// TODO: Also verify that the ProviderConfig is correct.
-			err = k8sClient.Get(ctx, req.NamespacedName, providerConfig)
+			got := controllers.NewProviderConfig(req.Name)
+			err = k8sClient.Get(ctx, req.NamespacedName, got)
 			Expect(err).To(BeNil())
-			Expect(providerConfig).To(EqualObject(want, IgnorePaths{
+			Expect(got).To(EqualObject(want, IgnorePaths{
 				"metadata.creationTimestamp",
 				"metadata.generation",
 				"metadata.managedFields",

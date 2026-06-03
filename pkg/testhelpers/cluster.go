@@ -12,6 +12,8 @@ import (
 )
 
 func NewClusterBuilder(namespace, name string) *ClusterBuilder {
+	ensureSchemeSet()
+
 	o := new(capi.Cluster)
 	o.SetNamespace(namespace)
 	o.SetName(name)

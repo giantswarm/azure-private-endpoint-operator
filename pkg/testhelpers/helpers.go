@@ -10,20 +10,45 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var scheme *runtime.Scheme
+var (
+	scheme    *runtime.Scheme
+	k8sClient client.Client
+)
 
-// SetScheme configures the Kubernetes API scheme used by the testhelpers package.
-func SetScheme(s *runtime.Scheme) {
+// SetHelperScheme configures the Kubernetes API scheme used by the testhelpers package.
+func SetHelperScheme(s *runtime.Scheme) {
 	scheme = s
 }
 
-func GetObjects(ctx context.Context, client client.Client, objs ...client.Object) {
+func ensureSchemeSet() {
+	if scheme == nil {
+		panic("attempted to use nil Kubernetes client scheme; " +
+			"ensure testhelpers.SetHelperScheme() is called with a non-nil scheme")
+	}
+}
+
+// SetClient configuures the Kubernetes client used by the testhelpers package.
+func SetHelperClient(c client.Client) {
+	k8sClient = c
+}
+
+func ensureClientSet() {
+	if k8sClient == nil {
+		panic("attempted to use nil Kubernetes client; " +
+			"ensure testhelpers.SetHelperClient() is called with a non-nil client")
+	}
+}
+
+// GetObjects retrieves the given objects.
+func GetObjects(ctx context.Context, objs ...client.Object) {
+	ensureClientSet()
+
 	for _, obj := range objs {
 		key := types.NamespacedName{
 			Namespace: obj.GetNamespace(),
 			Name:      obj.GetName(),
 		}
-		Expect(client.Get(ctx, key, obj)).To(Succeed(),
+		Expect(k8sClient.Get(ctx, key, obj)).To(Succeed(),
 			fmt.Sprintf("%s/%s, gvk: %s",
 				obj.GetNamespace(), obj.GetName(),
 				obj.GetObjectKind().GroupVersionKind().String()),
@@ -31,10 +56,12 @@ func GetObjects(ctx context.Context, client client.Client, objs ...client.Object
 	}
 }
 
-// CreateObjects ensures that the given Kubernetes objects are created using the client.
-func CreateObjects(ctx context.Context, client client.Client, objs ...client.Object) {
+// CreateObjectsWithClient ensures that the given Kubernetes objects are created.
+func CreateObjects(ctx context.Context, objs ...client.Object) {
+	ensureClientSet()
+
 	for _, obj := range objs {
-		Expect(client.Create(ctx, obj)).To(Succeed(),
+		Expect(k8sClient.Create(ctx, obj)).To(Succeed(),
 			fmt.Sprintf("%s/%s, gvk: %s",
 				obj.GetNamespace(), obj.GetName(),
 				obj.GetObjectKind().GroupVersionKind().String()),
@@ -42,9 +69,11 @@ func CreateObjects(ctx context.Context, client client.Client, objs ...client.Obj
 	}
 }
 
-// DeleteObjects ensures that the given Kubernetes objects are deleted using the client.
-func DeleteObjects(ctx context.Context, client client.Client, objs ...client.Object) {
+// DeleteObjectsWithClient ensures that the given Kubernetes objects are deleted.
+func DeleteObjects(ctx context.Context, objs ...client.Object) {
+	ensureClientSet()
+
 	for _, obj := range objs {
-		Expect(client.Delete(ctx, obj)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, obj)).To(Succeed())
 	}
 }

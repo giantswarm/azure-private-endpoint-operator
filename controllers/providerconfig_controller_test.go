@@ -51,7 +51,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 				"tenantID":       azureClusterIdentity.Spec.TenantID,
 			}
 
-			CreateObjects(ctx, k8sClient, azureClusterIdentity, azureCluster, cluster)
+			CreateObjects(ctx, azureClusterIdentity, azureCluster, cluster)
 
 			r, err := controllers.NewProviderConfigReconciler(k8sClient)
 			Expect(err).To(BeNil())
@@ -75,7 +75,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 			azureCluster := NewAzureClusterBuilder(namespace, "foo").Build()
 			cluster := NewClusterBuilder(namespace, "foo").WithAzureCluster(azureCluster).Build()
 
-			CreateObjects(ctx, k8sClient, azureCluster, cluster)
+			CreateObjects(ctx, azureCluster, cluster)
 
 			r, err := controllers.NewProviderConfigReconciler(k8sClient)
 			Expect(err).To(BeNil())
@@ -103,7 +103,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 				Kind:     "UnsupportedInfraCluster",
 				Name:     "unsupported-infracluster",
 			}
-			CreateObjects(ctx, k8sClient, cluster)
+			CreateObjects(ctx, cluster)
 
 			r, err := controllers.NewProviderConfigReconciler(k8sClient)
 			Expect(err).To(BeNil())
@@ -111,7 +111,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 			_, err = r.Reconcile(ctx, req)
 			Expect(err).To(BeNil())
 
-			GetObjects(ctx, k8sClient, cluster)
+			GetObjects(ctx, cluster)
 			Expect(cluster.Finalizers).ToNot(ContainElement(controllers.ProviderConfigControllerFinalizer))
 		})
 	})
@@ -142,7 +142,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 				"tenantID":       azureClusterIdentity.Spec.TenantID,
 			}
 
-			CreateObjects(ctx, k8sClient, providerConfig, azureClusterIdentity, azureCluster, cluster)
+			CreateObjects(ctx, providerConfig, azureClusterIdentity, azureCluster, cluster)
 
 			r, err := controllers.NewProviderConfigReconciler(k8sClient)
 			Expect(err).To(BeNil())
@@ -152,7 +152,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 			Expect(err).To(BeNil())
 
 			// Cluster should be in deleting state, and the reconciler should pick that up.
-			DeleteObjects(ctx, k8sClient, cluster)
+			DeleteObjects(ctx, cluster)
 
 			// Reconciler should detect the Cluster is deleting, and remove the ProviderConfig.
 			_, err = r.Reconcile(ctx, req)

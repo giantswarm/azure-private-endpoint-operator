@@ -62,7 +62,7 @@ var _ = BeforeSuite(func() {
 	Expect(capiv1beta1.AddToScheme(scheme)).Should(Succeed())
 	Expect(kcp.AddToScheme(scheme)).Should(Succeed())
 	Expect(capz.AddToScheme(scheme)).Should(Succeed())
-	testhelpers.SetScheme(scheme)
+	testhelpers.SetHelperScheme(scheme)
 
 	testEnv = &envtest.Environment{
 		Scheme: scheme,
@@ -90,6 +90,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
+	testhelpers.SetHelperClient(k8sClient)
 	komega.SetClient(k8sClient)
 })
 

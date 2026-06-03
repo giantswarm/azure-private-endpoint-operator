@@ -104,6 +104,17 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 	})
 
 	Describe("Deleting Cluster", func() {
+		It("does not error reconciling deleted cluster", func(ctx context.Context) {
+			name := "deleted-cluster"
+			req := Request(namespace, name)
+
+			r, err := controllers.NewProviderConfigReconciler(k8sClient)
+			Expect(err).To(BeNil())
+
+			_, err = r.Reconcile(ctx, req)
+			Expect(err).To(BeNil())
+		})
+
 		It("deletes ProviderConfig", func(ctx context.Context) {
 			name := "deleting-cluster"
 			req := Request(namespace, name)

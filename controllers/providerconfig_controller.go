@@ -51,7 +51,10 @@ func (r *ProviderConfigReconciler) Reconcile(ctx context.Context, req reconcile.
 	cluster := new(capi.Cluster)
 	err = r.client.Get(ctx, req.NamespacedName, cluster)
 	if err != nil {
-		logger.Error(err, "failed to get cluster")
+		if apierrors.IsNotFound(err) {
+			logger.Info("cluster has been deleted")
+			return result, nil
+		}
 		return
 	}
 

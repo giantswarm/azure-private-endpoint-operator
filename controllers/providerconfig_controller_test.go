@@ -28,8 +28,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 	})
 
 	Describe("Reconciling AzureCluster", func() {
-		ctx := context.Background()
-		It("creates a ProviderConfig", func() {
+		It("creates a ProviderConfig", func(ctx context.Context) {
 			req := Request(namespace, "foo")
 
 			azureClusterIdentity := NewAzureClusterIdentityBuilder(namespace, "foo").
@@ -71,7 +70,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 			}))
 		})
 
-		It("returns error when identityRef is unset", func() {
+		It("returns error when identityRef is unset", func(ctx context.Context) {
 			azureCluster := NewAzureClusterBuilder(namespace, "foo").Build()
 			cluster := NewClusterBuilder(namespace, "foo").WithAzureCluster(azureCluster).Build()
 
@@ -87,8 +86,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 	})
 
 	Describe("Reconciling unsupported configuration", func() {
-		ctx := context.Background()
-		It("does not add a finalizer", func() {
+		It("does not add a finalizer", func(ctx context.Context) {
 			name := "unsupported-cluster"
 			req := Request(namespace, name)
 
@@ -117,8 +115,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 	})
 
 	Describe("Deleting Cluster", func() {
-		ctx := context.Background()
-		It("deletes ProviderConfig", func() {
+		It("deletes ProviderConfig", func(ctx context.Context) {
 			name := "deleting-cluster"
 			req := Request(namespace, name)
 

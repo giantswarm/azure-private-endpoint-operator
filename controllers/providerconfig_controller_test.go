@@ -5,7 +5,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/cluster-api/api/core/v1beta2"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
@@ -90,17 +89,7 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 			name := "unsupported-cluster"
 			req := Request(namespace, name)
 
-			cluster := NewClusterBuilder(namespace, name).Build()
-			cluster.Spec.ControlPlaneRef = v1beta2.ContractVersionedObjectReference{
-				APIGroup: "controlplane.cluster.x-k8s.io",
-				Kind:     "UnsupportedControlPlane",
-				Name:     "unsupported-controlplane",
-			}
-			cluster.Spec.InfrastructureRef = v1beta2.ContractVersionedObjectReference{
-				APIGroup: "infrastructure.cluster.x-k8s.io",
-				Kind:     "UnsupportedInfraCluster",
-				Name:     "unsupported-infracluster",
-			}
+			cluster := NewClusterBuilder(namespace, name).WithDummyReferences().Build()
 			CreateObjects(ctx, cluster)
 
 			r, err := controllers.NewProviderConfigReconciler(k8sClient)
@@ -156,6 +145,31 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 			Expect(err).To(BeNil())
 
 			Eventually(Get(providerConfig)).ShouldNot(Succeed())
+		})
+
+		It("removes finalizer if ProviderConfig does not exist", func(ctx context.Context) {
+			name := "deleting-cluster"
+			req := Request(namespace, name)
+
+			cluster := NewClusterBuilder(namespace, req.Name).
+				WithFinalizers(controllers.ProviderConfigControllerFinalizer).
+				WithDummyReferences().
+				Build()
+
+			CreateObjects(ctx, cluster)
+			// Put Cluster into Deleting state. The Finalizer will prevent it from being deleted.
+			DeleteObjects(ctx, cluster)
+			// Ensure that the Cluster is actually present, because we will later assert that it is not.
+			Eventually(Get(cluster)).Should(Succeed())
+
+			r, err := controllers.NewProviderConfigReconciler(k8sClient)
+			Expect(err).To(BeNil())
+
+			_, err = r.Reconcile(ctx, req)
+			Expect(err).To(BeNil())
+
+			// The Cluster should be gone now, indicating that the finalizer was removed.
+			Eventually(Get(cluster)).ShouldNot(Succeed())
 		})
 	})
 })

@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metaerr "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -163,7 +165,11 @@ func (r *ProviderConfigReconciler) reconcileDelete(ctx context.Context, cluster 
 	providerConfig := NewProviderConfig(cluster.Name)
 	err = r.client.Delete(ctx, providerConfig)
 	if err != nil {
-		return
+		if !apierrors.IsNotFound(err) &&
+			!metaerr.IsNoMatchError(err) {
+			return
+		}
+		err = nil
 	}
 
 	origCluster := cluster.DeepCopy()

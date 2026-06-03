@@ -5,6 +5,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"sigs.k8s.io/cluster-api/api/core/v1beta2"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
@@ -82,6 +83,36 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 			req := Request(namespace, "foo")
 			_, err = r.Reconcile(context.Background(), req)
 			Expect(err).To(MatchError(controllers.ErrIdentityRefUnset))
+		})
+	})
+
+	Describe("Reconciling unsupported configuration", func() {
+		ctx := context.Background()
+		It("does not add a finalizer", func() {
+			name := "unsupported-cluster"
+			req := Request(namespace, name)
+
+			cluster := NewClusterBuilder(namespace, name).Build()
+			cluster.Spec.ControlPlaneRef = v1beta2.ContractVersionedObjectReference{
+				APIGroup: "controlplane.cluster.x-k8s.io",
+				Kind:     "UnsupportedControlPlane",
+				Name:     "unsupported-controlplane",
+			}
+			cluster.Spec.InfrastructureRef = v1beta2.ContractVersionedObjectReference{
+				APIGroup: "infrastructure.cluster.x-k8s.io",
+				Kind:     "UnsupportedInfraCluster",
+				Name:     "unsupported-infracluster",
+			}
+			CreateObjects(ctx, k8sClient, cluster)
+
+			r, err := controllers.NewProviderConfigReconciler(k8sClient)
+			Expect(err).To(BeNil())
+
+			_, err = r.Reconcile(ctx, req)
+			Expect(err).To(BeNil())
+
+			GetObjects(ctx, k8sClient, cluster)
+			Expect(cluster.Finalizers).ToNot(ContainElement(controllers.ProviderConfigControllerFinalizer))
 		})
 	})
 

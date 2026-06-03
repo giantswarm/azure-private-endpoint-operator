@@ -35,12 +35,16 @@ func NewProviderConfigReconciler(client client.Client) (*ProviderConfigReconcile
 	}, nil
 }
 
+// ProviderConfigReconciler manages Crossplane ProviderConfig resources for Azure and AKS clusters.
 type ProviderConfigReconciler struct {
 	client client.Client
 }
 
 func (r *ProviderConfigReconciler) Reconcile(ctx context.Context, req reconcile.Request) (result reconcile.Result, err error) {
 	logger := log.FromContext(ctx)
+
+	logger.Info("starting reconciliation")
+	defer logger.Info("finished reconciliation")
 
 	cluster := new(capi.Cluster)
 	err = r.client.Get(ctx, req.NamespacedName, cluster)
@@ -98,7 +102,7 @@ func (r *ProviderConfigReconciler) reconcileNormal(ctx context.Context, cluster 
 		info.SubscriptionID = azureCluster.Spec.SubscriptionID
 
 	default:
-		logger.Info("skipping provider config generation for unsupported controlplane", "kind", cluster.Spec.ControlPlaneRef.Kind)
+		logger.Info("skipping provider config generation for unsupported cluster")
 		return
 	}
 

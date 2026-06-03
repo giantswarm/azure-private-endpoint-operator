@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/gomega" //nolint: staticcheck
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -16,12 +17,27 @@ func SetScheme(s *runtime.Scheme) {
 	scheme = s
 }
 
+func GetObjects(ctx context.Context, client client.Client, objs ...client.Object) {
+	for _, obj := range objs {
+		key := types.NamespacedName{
+			Namespace: obj.GetNamespace(),
+			Name:      obj.GetName(),
+		}
+		Expect(client.Get(ctx, key, obj)).To(Succeed(),
+			fmt.Sprintf("%s/%s, gvk: %s",
+				obj.GetNamespace(), obj.GetName(),
+				obj.GetObjectKind().GroupVersionKind().String()),
+		)
+	}
+}
+
 // CreateObjects ensures that the given Kubernetes objects are created using the client.
 func CreateObjects(ctx context.Context, client client.Client, objs ...client.Object) {
 	for _, obj := range objs {
-		Expect(client.Create(ctx, obj)).To(Succeed(), fmt.Sprintf("%s/%s, gvk: %s",
-			obj.GetNamespace(), obj.GetName(),
-			obj.GetObjectKind().GroupVersionKind().String()),
+		Expect(client.Create(ctx, obj)).To(Succeed(),
+			fmt.Sprintf("%s/%s, gvk: %s",
+				obj.GetNamespace(), obj.GetName(),
+				obj.GetObjectKind().GroupVersionKind().String()),
 		)
 	}
 }

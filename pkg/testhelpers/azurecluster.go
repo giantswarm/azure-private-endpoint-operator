@@ -3,12 +3,14 @@ package testhelpers
 import (
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
 )
 
 type AzureClusterBuilder struct {
+	namespace, name   string
 	deletionTimestamp *meta.Time
 	finalizers        []string
 	subscriptionID    string
@@ -17,13 +19,24 @@ type AzureClusterBuilder struct {
 	subnets           capz.Subnets
 	apiServerLB       capz.LoadBalancerSpec
 	conditions        capi.Conditions
+	identityRef       *corev1.ObjectReference
 }
 
-func NewAzureClusterBuilder(subscriptionID, resourceGroup string) *AzureClusterBuilder {
+func NewAzureClusterBuilder(namespace, name string) *AzureClusterBuilder {
 	return &AzureClusterBuilder{
-		subscriptionID: subscriptionID,
-		resourceGroup:  resourceGroup,
+		namespace: namespace,
+		name:      name,
 	}
+}
+
+func (b *AzureClusterBuilder) WithResourceGroup(resourceGroup string) *AzureClusterBuilder {
+	b.resourceGroup = resourceGroup
+	return b
+}
+
+func (b *AzureClusterBuilder) WithSubscriptionID(subscriptionID string) *AzureClusterBuilder {
+	b.subscriptionID = subscriptionID
+	return b
 }
 
 func (b *AzureClusterBuilder) WithLocation(location string) *AzureClusterBuilder {
@@ -70,20 +83,33 @@ func (b *AzureClusterBuilder) WithCondition(condition *capi.Condition) *AzureClu
 	return b
 }
 
+func (b *AzureClusterBuilder) WithIdentity(identity *capz.AzureClusterIdentity) *AzureClusterBuilder {
+	b.identityRef = &corev1.ObjectReference{
+		Kind:      identity.Kind,
+		Namespace: identity.Namespace,
+		Name:      identity.Name,
+	}
+	return b
+}
+
 func (b *AzureClusterBuilder) Build() *capz.AzureCluster {
 	azureCluster := capz.AzureCluster{
+		TypeMeta: meta.TypeMeta{
+			Kind: capz.AzureClusterKind,
+		},
 		ObjectMeta: meta.ObjectMeta{
-			Name:              b.resourceGroup,
-			Namespace:         "org-giantswarm",
+			Namespace:         b.namespace,
+			Name:              b.name,
 			Finalizers:        b.finalizers,
 			DeletionTimestamp: b.deletionTimestamp,
 		},
 		Spec: capz.AzureClusterSpec{
-			ResourceGroup: b.resourceGroup,
 			AzureClusterClassSpec: capz.AzureClusterClassSpec{
 				SubscriptionID: b.subscriptionID,
 				Location:       b.location,
+				IdentityRef:    b.identityRef,
 			},
+			ResourceGroup: b.resourceGroup,
 			NetworkSpec: capz.NetworkSpec{
 				APIServerLB: &b.apiServerLB,
 				Subnets:     b.subnets,

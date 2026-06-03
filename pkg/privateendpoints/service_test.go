@@ -53,13 +53,17 @@ var _ = Describe("Service", func() {
 			otherSubscription := "abcd"
 
 			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", mcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
 			// WC AzureClusterResource
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(otherSubscription, wcResourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", wcResourceGroup).
+				WithSubscriptionID(otherSubscription).
+				WithResourceGroup(wcResourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(otherSubscription).
 					Build()).
@@ -98,13 +102,17 @@ var _ = Describe("Service", func() {
 	When("workload cluster with private link has just been created and private links are still not ready", func() {
 		BeforeEach(func(ctx context.Context) {
 			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", mcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
 			// WC AzureClusterResource
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", wcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(wcResourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
@@ -147,13 +155,17 @@ var _ = Describe("Service", func() {
 
 		BeforeEach(func(ctx context.Context) {
 			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", mcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
 			// WC AzureClusterResource
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", wcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(wcResourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
@@ -250,13 +262,17 @@ var _ = Describe("Service", func() {
 			// MC AzureCluster resource with private endpoints, as the WC has already been reconciled
 			expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
 			privateEndpoints := capz.PrivateEndpoints{expectedPrivateEndpointSpec(location, subscriptionID, mcResourceGroup, testPrivateLinkName)}
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", mcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
 				Build()
 
 			// WC AzureClusterResource
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", wcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(wcResourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
@@ -328,13 +344,17 @@ var _ = Describe("Service", func() {
 				expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, testPrivateLinkName),
 				expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, removedPrivateLinkName),
 			}
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", mcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
 				Build()
 
 			// WC AzureClusterResource
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", wcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(wcResourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
@@ -406,13 +426,17 @@ var _ = Describe("Service", func() {
 		BeforeEach(func(ctx context.Context) {
 			// MC AzureCluster resource with private endpoints, as the WC has already been reconciled
 			privateEndpoints := capz.PrivateEndpoints{expectedPrivateEndpointSpec(location, subscriptionID, mcResourceGroup, testPrivateLinkName)}
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", mcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
 				Build()
 
 			// WC AzureClusterResource
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", wcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(wcResourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).

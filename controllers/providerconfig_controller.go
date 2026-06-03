@@ -63,13 +63,6 @@ func (r *ProviderConfigReconciler) Reconcile(ctx context.Context, req reconcile.
 func (r *ProviderConfigReconciler) reconcileNormal(ctx context.Context, cluster *capi.Cluster) (result reconcile.Result, err error) {
 	logger := log.FromContext(ctx)
 
-	origCluster := cluster.DeepCopy()
-	if controllerutil.AddFinalizer(cluster, ProviderConfigControllerFinalizer) {
-		if err = r.client.Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
-			return
-		}
-	}
-
 	var info identityInfo
 	identityRef := new(corev1.ObjectReference)
 	switch {
@@ -138,6 +131,16 @@ func (r *ProviderConfigReconciler) reconcileNormal(ctx context.Context, cluster 
 	default:
 		logger.Info("skipping provider config generation for unsupported identity", "kind", identityRef.GroupVersionKind())
 		return
+	}
+
+	// Cluster has a supported configuration, so we will create a ProviderConfig.
+	// Let's add a finalizer to the Cluster so that we can clean up the ProviderConfig
+	// when this Cluster gets deleted.
+	origCluster := cluster.DeepCopy()
+	if controllerutil.AddFinalizer(cluster, ProviderConfigControllerFinalizer) {
+		if err = r.client.Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
+			return
+		}
 	}
 
 	providerConfig := NewProviderConfig(cluster.Name)

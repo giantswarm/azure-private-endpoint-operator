@@ -124,12 +124,13 @@ rules:
   resources:
   - providerconfigs
   verbs:
+  - create
   - get
   - list
+  - watch
   - patch
   - update
   - delete
-  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

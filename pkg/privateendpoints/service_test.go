@@ -7,8 +7,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/azure/mock_azure"
@@ -35,12 +37,15 @@ var _ = Describe("Service", func() {
 	var privateLinksScope privateendpoints.PrivateLinksScope
 	var privateEndpointsScope privateendpoints.Scope
 	var service *privateendpoints.Service
+	var scheme *runtime.Scheme
 
 	BeforeEach(func() {
 		subscriptionID = "1234"
 		location = "westeurope"
 		mcResourceGroup = "test-mc-rg"
 		wcResourceGroup = "test-wc-rg"
+		scheme = runtime.NewScheme()
+		Expect(capz.AddToScheme(scheme)).To(Succeed())
 	})
 
 	When("there is no private link where MC subscription is allowed", func() {
@@ -48,23 +53,25 @@ var _ = Describe("Service", func() {
 			otherSubscription := "abcd"
 
 			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", mcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
 			// WC AzureClusterResource
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(otherSubscription, wcResourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", wcResourceGroup).
+				WithSubscriptionID(otherSubscription).
+				WithResourceGroup(wcResourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(otherSubscription).
 					Build()).
 				Build()
 
 			// Kubernetes client
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(managementAzureCluster, workloadAzureCluster).
 				Build()
 
@@ -77,7 +84,7 @@ var _ = Describe("Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private links scope
-			privateLinksScope, err = privatelinks.NewScope(workloadAzureCluster, client)
+			privateLinksScope, err := privatelinks.NewScope(workloadAzureCluster, client)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Private endpoints service
@@ -95,23 +102,25 @@ var _ = Describe("Service", func() {
 	When("workload cluster with private link has just been created and private links are still not ready", func() {
 		BeforeEach(func(ctx context.Context) {
 			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", mcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
 			// WC AzureClusterResource
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", wcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(wcResourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
 				Build()
 
 			// Kubernetes client
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(managementAzureCluster, workloadAzureCluster).
 				Build()
 
@@ -146,24 +155,29 @@ var _ = Describe("Service", func() {
 
 		BeforeEach(func(ctx context.Context) {
 			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", mcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
 			// WC AzureClusterResource
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", wcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(wcResourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				Build()
 
 			// Kubernetes client
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(managementAzureCluster, workloadAzureCluster).
 				Build()
 
@@ -248,24 +262,29 @@ var _ = Describe("Service", func() {
 			// MC AzureCluster resource with private endpoints, as the WC has already been reconciled
 			expectedPrivateEndpointName := fmt.Sprintf("%s-privateendpoint", testPrivateLinkName)
 			privateEndpoints := capz.PrivateEndpoints{expectedPrivateEndpointSpec(location, subscriptionID, mcResourceGroup, testPrivateLinkName)}
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", mcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
 				Build()
 
 			// WC AzureClusterResource
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", wcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(wcResourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				Build()
 
 			// Kubernetes client
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(managementAzureCluster, workloadAzureCluster).
 				Build()
 
@@ -325,24 +344,29 @@ var _ = Describe("Service", func() {
 				expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, testPrivateLinkName),
 				expectedPrivateEndpointSpec(location, subscriptionID, wcResourceGroup, removedPrivateLinkName),
 			}
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", mcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
 				Build()
 
 			// WC AzureClusterResource
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", wcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(wcResourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				Build()
 
 			// Kubernetes client
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(managementAzureCluster, workloadAzureCluster).
 				Build()
 
@@ -402,24 +426,29 @@ var _ = Describe("Service", func() {
 		BeforeEach(func(ctx context.Context) {
 			// MC AzureCluster resource with private endpoints, as the WC has already been reconciled
 			privateEndpoints := capz.PrivateEndpoints{expectedPrivateEndpointSpec(location, subscriptionID, mcResourceGroup, testPrivateLinkName)}
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, mcResourceGroup).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", mcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(mcResourceGroup).
 				WithLocation(location).
 				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
 				Build()
 
 			// WC AzureClusterResource
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, wcResourceGroup).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", wcResourceGroup).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(wcResourceGroup).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkName).
 					WithAllowedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				Build()
 
 			// Kubernetes client
-			capzSchema, err := capz.SchemeBuilder.Build()
-			Expect(err).NotTo(HaveOccurred())
 			client := fake.NewClientBuilder().
-				WithScheme(capzSchema).
+				WithScheme(scheme).
 				WithObjects(managementAzureCluster, workloadAzureCluster).
 				Build()
 

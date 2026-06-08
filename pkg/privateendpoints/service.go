@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	"sigs.k8s.io/cluster-api-provider-azure/util/slice"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	v1beta1conditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/giantswarm/microerror"
@@ -24,6 +26,8 @@ const (
 
 // PrivateLinksScope is the interface for getting private links for which the private endpoints are needed.
 type PrivateLinksScope interface {
+	v1beta1conditions.Getter
+
 	GetClusterName() types.NamespacedName
 	GetSubscriptionID() string
 	GetLocation() string
@@ -84,7 +88,7 @@ func (s *Service) ReconcileMcToWcApi(ctx context.Context) error {
 	//
 	for _, privateLink := range privateLinks {
 		logger.Info(fmt.Sprintf("Found private link %s", privateLink.Name))
-		manualApproval := !slice.Contains(util.ConvertToStringSlice(privateLink.AutoApprovedSubscriptions), s.privateEndpointsScope.GetSubscriptionID())
+		manualApproval := !slices.Contains(util.ConvertToStringSlice(privateLink.AutoApprovedSubscriptions), s.privateEndpointsScope.GetSubscriptionID())
 		var requestMessage string
 		if manualApproval {
 			requestMessage = fmt.Sprintf("Giant Swarm azure-private-endpoint-operator that is running in "+
@@ -169,11 +173,14 @@ func (s *Service) ReconcileWcToMcIngress(ctx context.Context, specs []capz.Priva
 		logger.Info("set private endpoint IP address in WC AzureCluster", "name", spec.Name, "ipAddress", ip.String())
 	}
 
-	s.privateLinksScope.SetCondition(capi.Condition{
-		Type:    ConditionGSPrivateLinksReady,
-		Status:  v1.ConditionTrue,
-		Message: "GiantSwarm Private Link definitions have been added",
-	})
+	if !v1beta1conditions.IsTrue(s.privateLinksScope, ConditionGSPrivateLinksReady) {
+		s.privateLinksScope.SetCondition(capi.Condition{
+			Type:               ConditionGSPrivateLinksReady,
+			Status:             v1.ConditionTrue,
+			Message:            "GiantSwarm Private Link definitions have been added",
+			LastTransitionTime: metav1.Now(),
+		})
+	}
 
 	return nil
 }

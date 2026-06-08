@@ -116,6 +116,21 @@ rules:
   - azureidentitybindings
   verbs:
   - create
+#
+# ProviderConfigs
+#
+- apiGroups:
+  - azure.upbound.io
+  resources:
+  - providerconfigs
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - patch
+  - update
+  - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

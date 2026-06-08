@@ -6,12 +6,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -20,15 +18,6 @@ import (
 )
 
 var _ = Describe("KubeadmControlPlaneReconciler", func() {
-	var scheme *runtime.Scheme
-
-	BeforeEach(func() {
-		scheme = runtime.NewScheme()
-		utilruntime.Must(kcpv1.AddToScheme(scheme))
-		utilruntime.Must(capi.AddToScheme(scheme))
-		utilruntime.Must(capz.AddToScheme(scheme))
-	})
-
 	Describe("Constructor", func() {
 		var client client.WithWatch
 		var mcName types.NamespacedName
@@ -115,7 +104,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 
 			It("proceeds when all preflight checks pass", func(ctx context.Context) {
 				kcp := NewKubeadmControlPlaneBuilder(namespace, name).Build()
-				_ = NewClusterBuilder(scheme).WithControlPlane(kcp).Build()
+				_ = NewClusterBuilder(namespace, name).WithControlPlane(kcp).Build()
 
 				err := reconciler.PreflightCheckControlPlane(ctx, kcp)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -124,14 +113,14 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 
 		Describe("Cluster", func() {
 			It("cancels when the cluster is paused", func(ctx context.Context) {
-				cluster := NewClusterBuilder(scheme).WithPause().Build()
+				cluster := NewClusterBuilder(namespace, name).WithPause().Build()
 
 				err := reconciler.PreflightCheckCluster(ctx, cluster)
 				Expect(err).To(MatchError(controllers.ErrReasonClusterPaused))
 			})
 
 			It("cancels when the cluster has no infrastructure ref", func(ctx context.Context) {
-				cluster := NewClusterBuilder(scheme).Build()
+				cluster := NewClusterBuilder(namespace, name).Build()
 
 				err := reconciler.PreflightCheckCluster(ctx, cluster)
 				Expect(err).To(MatchError(controllers.ErrReasonInfraClusterMissing))
@@ -139,7 +128,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 
 			It("proceeds when all preflight checks pass", func(ctx context.Context) {
 				azureCluster := NewAzureClusterBuilder("", "").Build()
-				cluster := NewClusterBuilder(scheme).WithAzureCluster(azureCluster).Build()
+				cluster := NewClusterBuilder(namespace, name).WithAzureCluster(azureCluster).Build()
 
 				err := reconciler.PreflightCheckCluster(ctx, cluster)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -150,14 +139,16 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 	Describe("Reconciliation", func() {
 		It("pauses the control plane when infracluster status conditions are unmet", func(ctx context.Context) {
 			name, namespace := "test", "org-giantswarm"
-			mcInfraCluster := NewAzureClusterBuilder("", "management-cluster").
+			mcInfraCluster := NewAzureClusterBuilder(namespace, "management-cluster").
+				WithResourceGroup("management-cluster").
 				WithAPILoadBalancerType(capz.Internal).
 				Build()
 			mcName := types.NamespacedName{Namespace: mcInfraCluster.Namespace, Name: mcInfraCluster.Name}
 			kcp := NewKubeadmControlPlaneBuilder(namespace, name).Build()
-			infraCluster := NewAzureClusterBuilder("", name).
+			infraCluster := NewAzureClusterBuilder(namespace, name).
+				WithResourceGroup(name).
 				Build()
-			cluster := NewClusterBuilder(scheme).
+			cluster := NewClusterBuilder(namespace, name).
 				WithControlPlane(kcp).
 				WithAzureCluster(infraCluster).
 				Build()
@@ -168,14 +159,14 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				Build()
 
 			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, mcName, &controllers.KubeadmControlPlaneReconcilerOptions{
-				AzureClusterGates: []capi.ConditionType{"NotMet"},
+				AzureClusterGates: []capiv1beta1.ConditionType{"NotMet"},
 			})
 			Expect(err).ShouldNot(HaveOccurred())
 
 			request := Request(namespace, name)
 			result, err := reconciler.Reconcile(ctx, request)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(result.Requeue).Should(BeFalse())
+			Expect(result.RequeueAfter).Should(BeZero())
 
 			err = client.Get(ctx, request.NamespacedName, kcp)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -184,20 +175,22 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 
 		It("unpauses the control plane when all conditions are met", func(ctx context.Context) {
 			name, namespace := "test", "org-giantswarm"
-			condition := capi.Condition{
+			condition := capiv1beta1.Condition{
 				Type:   "YesMet",
 				Status: corev1.ConditionTrue,
 			}
-			mcInfraCluster := NewAzureClusterBuilder("", "management-cluster").
+			mcInfraCluster := NewAzureClusterBuilder(namespace, "management-cluster").
+				WithResourceGroup("management-cluster").
 				WithAPILoadBalancerType(capz.Internal).
 				Build()
 			mcName := types.NamespacedName{Namespace: mcInfraCluster.Namespace, Name: mcInfraCluster.Name}
 			kcp := NewKubeadmControlPlaneBuilder(namespace, name).WithPause().Build()
-			infraCluster := NewAzureClusterBuilder("", name).
+			infraCluster := NewAzureClusterBuilder(namespace, name).
+				WithResourceGroup(name).
 				WithAPILoadBalancerType(capz.Internal).
 				WithCondition(&condition).
 				Build()
-			cluster := NewClusterBuilder(scheme).
+			cluster := NewClusterBuilder(namespace, name).
 				WithControlPlane(kcp).
 				WithAzureCluster(infraCluster).
 				Build()
@@ -208,14 +201,14 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				Build()
 
 			reconciler, err := controllers.NewKubeadmControlPlaneReconciler(client, mcName, &controllers.KubeadmControlPlaneReconcilerOptions{
-				AzureClusterGates: []capi.ConditionType{condition.Type},
+				AzureClusterGates: []capiv1beta1.ConditionType{condition.Type},
 			})
 			Expect(err).ShouldNot(HaveOccurred())
 
 			request := Request(namespace, name)
 			result, err := reconciler.Reconcile(ctx, request)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(result.Requeue).Should(BeFalse())
+			Expect(result.RequeueAfter).Should(BeZero())
 
 			err = client.Get(ctx, request.NamespacedName, kcp)
 			Expect(err).ShouldNot(HaveOccurred())

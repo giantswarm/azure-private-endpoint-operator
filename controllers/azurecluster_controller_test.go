@@ -8,10 +8,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -45,6 +47,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 	var k8sClient client.Client
 	var privateEndpointsClientCreator azure.PrivateEndpointsClientCreator
 	var reconciler *controllers.AzureClusterReconciler
+	var scheme *runtime.Scheme
 
 	BeforeEach(func() {
 		subscriptionID = "1234"
@@ -74,8 +77,8 @@ var _ = Describe("AzureClusterReconciler", func() {
 	})
 
 	JustBeforeEach(func() {
-		capzSchema, err := capz.SchemeBuilder.Build()
-		Expect(err).NotTo(HaveOccurred())
+		scheme = runtime.NewScheme()
+		Expect(capz.AddToScheme(scheme)).To(Succeed())
 
 		var objects []client.Object
 		if managementAzureCluster != nil {
@@ -85,7 +88,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 			objects = append(objects, workloadAzureCluster)
 		}
 		k8sClientBuilder := fake.NewClientBuilder().
-			WithScheme(capzSchema).
+			WithScheme(scheme).
 			WithStatusSubresource(&capz.AzureCluster{})
 		if len(objects) > 0 {
 			k8sClientBuilder.WithObjects(objects...)
@@ -155,7 +158,9 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		When("the cluster is the MC", func() {
 			BeforeEach(func() {
-				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterName).
+				workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", managementClusterName).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(managementClusterName).
 					WithAPILoadBalancerType(capz.Internal).
 					Build()
 			})
@@ -181,11 +186,15 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		When("workload cluster has an unknown type load balancer", func() {
 			BeforeEach(func() {
-				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+				workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", workloadClusterName).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(workloadClusterName).
 					WithAPILoadBalancerType("SomethingNew").
 					Build()
 
-				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterName).
+				managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", managementClusterName).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(managementClusterName).
 					WithAPILoadBalancerType(capz.Public).
 					Build()
 			})
@@ -211,7 +220,9 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		When("MC AzureCluster resource is not found (e.g. misconfigured operator)", func() {
 			BeforeEach(func() {
-				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+				workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", workloadClusterName).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(workloadClusterName).
 					WithAPILoadBalancerType(capz.Internal).
 					Build()
 			})
@@ -242,19 +253,26 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		BeforeEach(func() {
 			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", managementClusterNamespacedName.Name).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(managementClusterNamespacedName.Name).
 				WithLocation(location).
 				WithAPILoadBalancerType(capz.Public).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", workloadClusterName).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(workloadClusterName).
 				WithAPILoadBalancerType(capz.Internal).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
 					WithAllowedSubscription(subscriptionID).
 					WithAutoApprovedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
@@ -357,20 +375,27 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		BeforeEach(func() {
 			// MC AzureCluster resource (without private endpoints, as the WC has just been created)
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", managementClusterNamespacedName.Name).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(managementClusterNamespacedName.Name).
 				WithLocation(location).
 				WithAPILoadBalancerType(capz.Internal).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", workloadClusterName).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(workloadClusterName).
 				WithAPILoadBalancerType(capz.Internal).
 				WithLocation(location).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
 					WithAllowedSubscription(subscriptionID).
 					WithAutoApprovedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				WithSubnet("test-subnet", capz.SubnetNode, nil).
 				Build()
 
@@ -466,20 +491,27 @@ var _ = Describe("AzureClusterReconciler", func() {
 					WithPrivateLinkServiceConnection(subscriptionID, workloadClusterName, testPrivateLinkNameForWcAPI).
 					Build(),
 			}
-			managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
+			managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", managementClusterNamespacedName.Name).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(managementClusterNamespacedName.Name).
 				WithLocation(location).
 				WithAPILoadBalancerType(capz.Public).
 				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
 				Build()
 
-			workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+			workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", workloadClusterName).
+				WithSubscriptionID(subscriptionID).
+				WithResourceGroup(workloadClusterName).
 				WithAPILoadBalancerType(capz.Internal).
 				WithSubnet("test-subnet", capz.SubnetNode, privateEndpoints).
 				WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
 					WithAllowedSubscription(subscriptionID).
 					WithAutoApprovedSubscription(subscriptionID).
 					Build()).
-				WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+				WithCondition(&capi.Condition{
+					Type:   capz.PrivateLinksReadyCondition,
+					Status: corev1.ConditionTrue,
+				}).
 				WithFinalizer(controllers.AzureClusterControllerFinalizer).
 				WithDeletionTimestamp(time.Now()).
 				Build()
@@ -530,13 +562,17 @@ var _ = Describe("AzureClusterReconciler", func() {
 		When("workload cluster private links are not ready", func() {
 			BeforeEach(func() {
 				// MC AzureCluster resource (without private endpoints, as the WC has just been created)
-				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
+				managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", managementClusterNamespacedName.Name).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(managementClusterNamespacedName.Name).
 					WithLocation(location).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					WithAPILoadBalancerType(capz.Public).
 					Build()
 
-				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+				workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", workloadClusterName).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(workloadClusterName).
 					WithAPILoadBalancerType(capz.Internal).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
@@ -558,20 +594,27 @@ var _ = Describe("AzureClusterReconciler", func() {
 		// added to the management cluster, but CAPZ still hasn't created the private endpoint
 		When("private endpoint in MC has not been created yet", func() {
 			BeforeEach(func() {
-				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
+				managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", managementClusterNamespacedName.Name).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(managementClusterNamespacedName.Name).
 					WithLocation(location).
 					WithAPILoadBalancerType(capz.Public).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					Build()
 
-				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+				workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", workloadClusterName).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(workloadClusterName).
 					WithAPILoadBalancerType(capz.Internal).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
 						WithAllowedSubscription(subscriptionID).
 						WithAutoApprovedSubscription(subscriptionID).
 						Build()).
-					WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+					WithCondition(&capi.Condition{
+						Type:   capz.PrivateLinksReadyCondition,
+						Status: corev1.ConditionTrue,
+					}).
 					Build()
 
 				privateEndpointsClientCreator = func(_ context.Context, _ client.Client, cluster *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
@@ -598,20 +641,27 @@ var _ = Describe("AzureClusterReconciler", func() {
 		// private endpoint has been added to the workload cluster, but CAPZ still hasn't created the private endpoint
 		When("private endpoint in WC has not been created yet", func() {
 			BeforeEach(func() {
-				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
+				managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", managementClusterNamespacedName.Name).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(managementClusterNamespacedName.Name).
 					WithLocation(location).
 					WithAPILoadBalancerType(capz.Internal).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					Build()
 
-				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+				workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", workloadClusterName).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(workloadClusterName).
 					WithAPILoadBalancerType(capz.Public).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
 						WithAllowedSubscription(subscriptionID).
 						WithAutoApprovedSubscription(subscriptionID).
 						Build()).
-					WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+					WithCondition(&capi.Condition{
+						Type:   capz.PrivateLinksReadyCondition,
+						Status: corev1.ConditionTrue,
+					}).
 					Build()
 
 				privateEndpointsClientCreator = func(_ context.Context, _ client.Client, cluster *capz.AzureCluster) (azure.PrivateEndpointsClient, error) {
@@ -640,19 +690,26 @@ var _ = Describe("AzureClusterReconciler", func() {
 		// Azure
 		When("private endpoint in MC doesn't yet have a network interface with private IP", func() {
 			BeforeEach(func() {
-				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
+				managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", managementClusterNamespacedName.Name).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(managementClusterNamespacedName.Name).
 					WithLocation(location).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					WithAPILoadBalancerType(capz.Public).
 					Build()
 
-				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+				workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", workloadClusterName).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(workloadClusterName).
 					WithAPILoadBalancerType(capz.Internal).
 					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
 						WithAllowedSubscription(subscriptionID).
 						WithAutoApprovedSubscription(subscriptionID).
 						Build()).
-					WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+					WithCondition(&capi.Condition{
+						Type:   capz.PrivateLinksReadyCondition,
+						Status: corev1.ConditionTrue,
+					}).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					Build()
 
@@ -682,19 +739,26 @@ var _ = Describe("AzureClusterReconciler", func() {
 		// but private endpoint creation is still in progress on Azure
 		When("private endpoint in WC doesn't yet have a network interface with private IP", func() {
 			BeforeEach(func() {
-				managementAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, managementClusterNamespacedName.Name).
+				managementAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", managementClusterNamespacedName.Name).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(managementClusterNamespacedName.Name).
 					WithLocation(location).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					WithAPILoadBalancerType(capz.Internal).
 					Build()
 
-				workloadAzureCluster = testhelpers.NewAzureClusterBuilder(subscriptionID, workloadClusterName).
+				workloadAzureCluster = testhelpers.NewAzureClusterBuilder("org-giantswarm", workloadClusterName).
+					WithSubscriptionID(subscriptionID).
+					WithResourceGroup(workloadClusterName).
 					WithAPILoadBalancerType(capz.Public).
 					WithPrivateLink(testhelpers.NewPrivateLinkBuilder(testPrivateLinkNameForWcAPI).
 						WithAllowedSubscription(subscriptionID).
 						WithAutoApprovedSubscription(subscriptionID).
 						Build()).
-					WithCondition(conditions.TrueCondition(capz.PrivateLinksReadyCondition)).
+					WithCondition(&capi.Condition{
+						Type:   capz.PrivateLinksReadyCondition,
+						Status: corev1.ConditionTrue,
+					}).
 					WithSubnet("test-subnet", capz.SubnetNode, nil).
 					Build()
 

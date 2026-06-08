@@ -6,7 +6,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
 )
 
 var ()
@@ -17,7 +17,7 @@ func TestUtilities(t *testing.T) {
 }
 
 var _ = DescribeTable("AreStatusConditionsMet",
-	func(conditions v1beta1.Conditions, gates []v1beta1.ConditionType, want []v1beta1.ConditionType) {
+	func(conditions capi.Conditions, gates []capi.ConditionType, want []capi.ConditionType) {
 		unmet := FindUnmetStatusConditions(conditions, gates)
 		Expect(unmet).To(HaveExactElements(want))
 	},
@@ -47,30 +47,30 @@ var _ = DescribeTable("AreStatusConditionsMet",
 	),
 )
 
-// conditions is a helper for compactly generating a [v1beta1.Conditions].
+// conditions is a helper for compactly generating a [capi.Conditions].
 // It expects arguments in pairs, where the first in each pair is the condition type,
 // and the second is the condition status.
-func conditions(pairs ...string) v1beta1.Conditions {
+func conditions(pairs ...string) capi.Conditions {
 	if len(pairs)%2 != 0 {
 		panic("uneven amount of arguments given")
 	}
 
-	conditions := make(v1beta1.Conditions, 0)
+	conditions := make(capi.Conditions, 0)
 	for i := 0; i < len(pairs); i += 2 {
-		conditions = append(conditions, v1beta1.Condition{
-			Type:   v1beta1.ConditionType(pairs[i]),
+		conditions = append(conditions, capi.Condition{
+			Type:   capi.ConditionType(pairs[i]),
 			Status: v1.ConditionStatus(pairs[i+1]),
 		})
 	}
 	return conditions
 }
 
-// types is a helper for compactly generating a [][v1beta1.ConditionType].
-// It simply typecasts the given strings as [v1beta1.ConditionType].
-func types(t ...string) []v1beta1.ConditionType {
-	ts := make([]v1beta1.ConditionType, len(t))
+// types is a helper for compactly generating a [][capi.ConditionType].
+// It simply typecasts the given strings as [capi.ConditionType].
+func types(t ...string) []capi.ConditionType {
+	ts := make([]capi.ConditionType, len(t))
 	for i := range t {
-		ts[i] = v1beta1.ConditionType(t[i])
+		ts[i] = capi.ConditionType(t[i])
 	}
 	return ts
 }

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-09
+
+### Added
+
+- Generate Crossplane ProviderConfig for workload clusters.
+
 ### Changed
 
 - Update CAPI dependency from v1.9.4 to v1.12.4.
@@ -121,7 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated Dockerfile
 
-[Unreleased]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.3.2...v0.4.0

@@ -6,7 +6,7 @@ metadata:
   {{- include "labels.common" . | nindent 4 }}
 rules:
 #
-# Cluster and AzureCluster
+# Cluster, AzureCluster, and AzureASOManagedControlPlane
 #
 - apiGroups:
   - cluster.x-k8s.io
@@ -14,6 +14,8 @@ rules:
   resources:
   - azureclusters
   - azureclusters/status
+  - azureasomanagedcontrolplanes
+  - azureasomanagedcontrolplanes/status
   - clusters
   - clusters/status
   verbs:
@@ -23,13 +25,12 @@ rules:
   - update
   - watch
 #
-# KubeadmControlPlane and AzureASOManagedControlPlane
+# KubeadmControlPlane
 #
 - apiGroups:
   - controlplane.cluster.x-k8s.io
   resources:
   - kubeadmcontrolplanes
-  - azureasomanagedcontrolplanes
   verbs:
   - get
   - list

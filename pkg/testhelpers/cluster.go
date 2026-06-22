@@ -44,7 +44,7 @@ func (b *ClusterBuilder) WithPause() *ClusterBuilder {
 	return b
 }
 
-func (b *ClusterBuilder) WithControlPlane(kcp *kcp.KubeadmControlPlane) *ClusterBuilder {
+func (b *ClusterBuilder) WithKubeadmControlPlane(kcp *kcp.KubeadmControlPlane) *ClusterBuilder {
 	b.o.Spec.ControlPlaneRef = capi.ContractVersionedObjectReference{
 		APIGroup: capi.GroupVersionControlPlane.Group,
 		Kind:     kcp.Kind,
@@ -53,6 +53,20 @@ func (b *ClusterBuilder) WithControlPlane(kcp *kcp.KubeadmControlPlane) *Cluster
 	err := ctrl.SetControllerReference(b.o, kcp, scheme)
 	if err != nil {
 		panic(err)
+	}
+	return b
+}
+
+func (b *ClusterBuilder) WithAzureASOManagedControlPlane(o *capz.AzureASOManagedControlPlane) *ClusterBuilder {
+	b.o.Spec.ControlPlaneRef = capi.ContractVersionedObjectReference{
+		APIGroup: capi.GroupVersionControlPlane.Group,
+		Kind:     o.Kind,
+		Name:     o.Name,
+	}
+	b.o.Spec.InfrastructureRef = capi.ContractVersionedObjectReference{
+		APIGroup: capi.GroupVersionInfrastructure.Group,
+		Kind:     capz.AzureASOManagedClusterKind,
+		Name:     o.Name,
 	}
 	return b
 }

@@ -23,12 +23,13 @@ rules:
   - update
   - watch
 #
-# KubeadmControlPlane
+# KubeadmControlPlane and AzureASOManagedControlPlane
 #
 - apiGroups:
   - controlplane.cluster.x-k8s.io
   resources:
   - kubeadmcontrolplanes
+  - azureasomanagedcontrolplanes
   verbs:
   - get
   - list

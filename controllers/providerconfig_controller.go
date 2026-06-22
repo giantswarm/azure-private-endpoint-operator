@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/mutators"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,6 +22,7 @@ import (
 
 const (
 	ProviderConfigControllerFinalizer = "azure.giantswarm.io/providerconfig"
+	SecretIdentityKind                = "Secret"
 )
 
 var (
@@ -69,23 +71,10 @@ func (r *ProviderConfigReconciler) reconcileNormal(ctx context.Context, cluster 
 	logger := log.FromContext(ctx)
 
 	var info identityInfo
-	identityRef := new(corev1.ObjectReference)
-	switch {
-	case cluster.Spec.ControlPlaneRef.Kind == capz.AzureManagedControlPlaneKind:
-		azureManagedControlPlane := new(capz.AzureManagedControlPlane)
-		name := types.NamespacedName{
-			Namespace: cluster.Namespace,
-			Name:      cluster.Spec.ControlPlaneRef.Name,
-		}
-		err = r.client.Get(ctx, name, azureManagedControlPlane)
-		if err != nil {
-			logger.Error(err, "failed to get controlplane", "kind", azureManagedControlPlane.GroupVersionKind(), "name", name)
-			return
-		}
-		identityRef = azureManagedControlPlane.Spec.IdentityRef
-		info.SubscriptionID = azureManagedControlPlane.Spec.SubscriptionID
+	var identityRef *corev1.ObjectReference
 
-	case cluster.Spec.InfrastructureRef.Kind == capz.AzureClusterKind:
+	switch cluster.Spec.InfrastructureRef.Kind {
+	case capz.AzureClusterKind:
 		azureCluster := new(capz.AzureCluster)
 		name := types.NamespacedName{
 			Namespace: cluster.Namespace,
@@ -98,6 +87,44 @@ func (r *ProviderConfigReconciler) reconcileNormal(ctx context.Context, cluster 
 		}
 		identityRef = azureCluster.Spec.IdentityRef
 		info.SubscriptionID = azureCluster.Spec.SubscriptionID
+
+	case capz.AzureASOManagedClusterKind:
+		cp := new(capz.AzureASOManagedControlPlane)
+		name := types.NamespacedName{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Spec.ControlPlaneRef.Name,
+		}
+		err = r.client.Get(ctx, name, cp)
+		if err != nil {
+			logger.Error(err, "failed to get controlplane", "kind", cp.Kind, "name", name)
+			return
+		}
+
+		var resources []*unstructured.Unstructured
+		resources, err = mutators.ToUnstructured(ctx, cp.Spec.Resources)
+		if err != nil {
+			logger.Error(err, "failed to convert ASO resource into unstructured")
+			return
+		}
+
+		identityRef = &corev1.ObjectReference{
+			Kind: SecretIdentityKind,
+			Name: resources[0].GetAnnotations()["serviceoperator.azure.com/credential-from"],
+		}
+
+	case capz.AzureManagedClusterKind:
+		azureManagedControlPlane := new(capz.AzureManagedControlPlane)
+		name := types.NamespacedName{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Spec.ControlPlaneRef.Name,
+		}
+		err = r.client.Get(ctx, name, azureManagedControlPlane)
+		if err != nil {
+			logger.Error(err, "failed to get controlplane", "kind", azureManagedControlPlane.GroupVersionKind(), "name", name)
+			return
+		}
+		identityRef = azureManagedControlPlane.Spec.IdentityRef
+		info.SubscriptionID = azureManagedControlPlane.Spec.SubscriptionID
 
 	default:
 		logger.Info("skipping provider config generation for unsupported cluster")
@@ -133,6 +160,24 @@ func (r *ProviderConfigReconciler) reconcileNormal(ctx context.Context, cluster 
 			return
 		}
 
+	case SecretIdentityKind:
+		secret := new(corev1.Secret)
+		name := types.NamespacedName{
+			Namespace: cluster.Namespace,
+			Name:      identityRef.Name,
+		}
+		err = r.client.Get(ctx, name, secret)
+		if err != nil {
+			logger.Error(err, "failed to get ASO secret", "name", name)
+			return
+		}
+
+		// Just assume it's workload identity for now.
+		info.Type = capz.WorkloadIdentity
+		info.ClientID = string(secret.Data["AZURE_CLIENT_ID"])
+		info.SubscriptionID = string(secret.Data["AZURE_SUBSCRIPTION_ID"])
+		info.TenantID = string(secret.Data["AZURE_TENANT_ID"])
+
 	default:
 		logger.Info("skipping provider config generation for unsupported identity", "kind", identityRef.GroupVersionKind())
 		return
@@ -141,6 +186,7 @@ func (r *ProviderConfigReconciler) reconcileNormal(ctx context.Context, cluster 
 	// Cluster has a supported configuration, so we will create a ProviderConfig.
 	// Let's add a finalizer to the Cluster so that we can clean up the ProviderConfig
 	// when this Cluster gets deleted.
+	// TODO: Should there just be an owner reference and let the GC handle cleanup?
 	origCluster := cluster.DeepCopy()
 	if controllerutil.AddFinalizer(cluster, ProviderConfigControllerFinalizer) {
 		if err = r.client.Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {

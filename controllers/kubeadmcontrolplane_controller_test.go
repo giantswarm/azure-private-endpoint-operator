@@ -104,7 +104,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 
 			It("proceeds when all preflight checks pass", func(ctx context.Context) {
 				kcp := NewKubeadmControlPlaneBuilder(namespace, name).Build()
-				_ = NewClusterBuilder(namespace, name).WithControlPlane(kcp).Build()
+				_ = NewClusterBuilder(namespace, name).WithKubeadmControlPlane(kcp).Build()
 
 				err := reconciler.PreflightCheckControlPlane(ctx, kcp)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -149,7 +149,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				WithResourceGroup(name).
 				Build()
 			cluster := NewClusterBuilder(namespace, name).
-				WithControlPlane(kcp).
+				WithKubeadmControlPlane(kcp).
 				WithAzureCluster(infraCluster).
 				Build()
 
@@ -191,7 +191,7 @@ var _ = Describe("KubeadmControlPlaneReconciler", func() {
 				WithCondition(&condition).
 				Build()
 			cluster := NewClusterBuilder(namespace, name).
-				WithControlPlane(kcp).
+				WithKubeadmControlPlane(kcp).
 				WithAzureCluster(infraCluster).
 				Build()
 

@@ -84,6 +84,52 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 		})
 	})
 
+	Describe("Reconciling AzureASOManagedCluster", func() {
+		It("creates a ProviderConfig", func(ctx context.Context) {
+			req := Request(namespace, "foo")
+
+			secret := NewAzureASOCredentialsSecretBuilder(req.Namespace, req.Name).
+				WithTenantID("123").
+				WithClientID("456").
+				WithSubscriptionID("789").
+				Build()
+			azureAsoControlPlane := NewAzureASOManagedControlPlaneBuilder(req.Namespace, req.Name).
+				WithCredentialSecret(secret).
+				Build()
+			cluster := NewClusterBuilder(req.Namespace, req.Name).
+				WithAzureASOManagedControlPlane(azureAsoControlPlane).
+				Build()
+
+			want := controllers.NewProviderConfig(req.Name)
+			want.Object["spec"] = map[string]any{
+				"credentials": map[string]any{
+					"source": "UserAssignedManagedIdentity",
+				},
+				"clientID":       secret.StringData["AZURE_CLIENT_ID"],
+				"subscriptionID": secret.StringData["AZURE_SUBSCRIPTION_ID"],
+				"tenantID":       secret.StringData["AZURE_TENANT_ID"],
+			}
+
+			CreateObjects(ctx, secret, azureAsoControlPlane, cluster)
+
+			r, err := controllers.NewProviderConfigReconciler(k8sClient)
+			Expect(err).To(BeNil())
+
+			_, err = r.Reconcile(ctx, req)
+			Expect(err).To(BeNil())
+
+			got := controllers.NewProviderConfig(req.Name)
+			GetObjects(ctx, got)
+			Expect(got).To(EqualObject(want, IgnorePaths{
+				"metadata.creationTimestamp",
+				"metadata.generation",
+				"metadata.managedFields",
+				"metadata.resourceVersion",
+				"metadata.uid",
+			}))
+		})
+	})
+
 	Describe("Reconciling unsupported configuration", func() {
 		It("does not add a finalizer", func(ctx context.Context) {
 			name := "unsupported-cluster"

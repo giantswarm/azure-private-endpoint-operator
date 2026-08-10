@@ -118,3 +118,7 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.3 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
+
+replace github.com/jackc/pgx/v5 v5.7.4 => github.com/jackc/pgx/v5 v5.10.0
+
+replace github.com/yuin/goldmark v1.4.13 => github.com/yuin/goldmark v1.8.5

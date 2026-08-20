@@ -12,9 +12,9 @@ require (
 	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/tools v0.48.0
-	k8s.io/api v0.36.3
-	k8s.io/apimachinery v0.36.3
-	k8s.io/client-go v0.36.3
+	k8s.io/api v0.36.4
+	k8s.io/apimachinery v0.36.4
+	k8s.io/client-go v0.36.4
 	sigs.k8s.io/cluster-api v1.12.4
 	sigs.k8s.io/cluster-api-provider-azure v1.23.0
 	sigs.k8s.io/controller-runtime v0.24.1

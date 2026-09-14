@@ -16,7 +16,7 @@ func TestUtilities(t *testing.T) {
 	RunSpecs(t, "Controllers Suite")
 }
 
-var _ = DescribeTable("AreStatusConditionsMet",
+var _ = DescribeTable("FindUnmetStatusConditions",
 	func(conditions capi.Conditions, gates []capi.ConditionType, want []capi.ConditionType) {
 		unmet := FindUnmetStatusConditions(conditions, gates)
 		Expect(unmet).To(HaveExactElements(want))

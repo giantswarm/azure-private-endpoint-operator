@@ -24,7 +24,7 @@ func ConvertToStringSlice(pointers []*string) []string {
 	return result
 }
 
-// AreStatusConditionsMet asserts that the status of all given conditions is "True".
+// FindUnmetStatusConditions asserts that the status of all given conditions is "True".
 // Any condition that is not listed in parameter 'gates' is ignored.
 // It returns a slice of unmet conditions for reporting.
 // If all conditions are met, the returned slice is empty.

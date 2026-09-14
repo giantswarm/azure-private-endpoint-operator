@@ -187,9 +187,9 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			err = mcPrivateEndpointsService.ReconcileMcToWcApi(ctx)
 		}
 
-		// When LB of k8s api of MC is internal load balancer, we assume the cluster is private
-		// and the gateway LB is internal with a private link (<mc-name>-gateway-privatelink).
-		// We add a private endpoint to WC so that monitoring tools in WC can access the MC gateway.
+		// When the cluster network mode is private, we assume the gateway LB is internal
+		// with a private link (<mc-name>-gateway-privatelink). We add a private endpoint to WC
+		// so that monitoring tools in WC can access the MC gateway.
 		if err == nil && getNetworkMode(managementAzureCluster) == NetworkModePrivate {
 			err = wcPrivateEndpointsService.ReconcileWcToMcIngress(ctx, generateWcToMcPrivateEndpointSpecs(workloadAzureCluster, managementAzureCluster))
 		}

@@ -41,6 +41,16 @@ const (
 	AzureClusterControllerFinalizer string = "azure-private-endpoint-operator.giantswarm.io/azurecluster"
 )
 
+type NetworkMode int
+
+const (
+	NetworkModeAnnotation string = "giantswarm.io/network-mode"
+
+	NetworkModePublic NetworkMode = iota
+	NetworkModePrivate
+	NetworkModeBYON
+)
+
 // Options holds optional configuration for AzureClusterReconciler.
 type Options struct{}
 
@@ -173,14 +183,14 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if workloadAzureCluster.DeletionTimestamp.IsZero() {
 		r.setFinalizer(&workloadAzureCluster)
 
-		if workloadAzureCluster.Spec.NetworkSpec.APIServerLB.Type == capz.Internal {
+		if getNetworkMode(workloadAzureCluster) == NetworkModePrivate {
 			err = mcPrivateEndpointsService.ReconcileMcToWcApi(ctx)
 		}
 
 		// When LB of k8s api of MC is internal load balancer, we assume the cluster is private
 		// and the gateway LB is internal with a private link (<mc-name>-gateway-privatelink).
 		// We add a private endpoint to WC so that monitoring tools in WC can access the MC gateway.
-		if err == nil && managementAzureCluster.Spec.NetworkSpec.APIServerLB.Type == capz.Internal {
+		if err == nil && getNetworkMode(managementAzureCluster) == NetworkModePrivate {
 			err = wcPrivateEndpointsService.ReconcileWcToMcIngress(ctx, generateWcToMcPrivateEndpointSpecs(workloadAzureCluster, managementAzureCluster))
 		}
 
@@ -193,7 +203,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 	} else {
-		if workloadAzureCluster.Spec.NetworkSpec.APIServerLB.Type == capz.Internal {
+		if getNetworkMode(workloadAzureCluster) == NetworkModePrivate {
 			err = mcPrivateEndpointsService.DeleteMcToWcApi(ctx)
 		}
 		// We don't need to do anything for WC to MC connections.
@@ -244,6 +254,28 @@ func validateLBType(azureCluster capz.AzureCluster) error {
 			azureCluster.Name)
 	}
 	return nil
+}
+
+// getNetworkMode returns the cluster's network mode based on an annotation value.
+// If the annotation is not present, it falls back to the old behavior and assumes that
+// a cluster with an internal loadbalancer is private.
+func getNetworkMode(ac capz.AzureCluster) NetworkMode {
+	if mode, ok := ac.Annotations[NetworkModeAnnotation]; ok {
+		switch mode {
+		case "public":
+			return NetworkModePublic
+		case "private":
+			return NetworkModePrivate
+		case "byon":
+			return NetworkModeBYON
+		}
+	}
+
+	if ac.Spec.NetworkSpec.APIServerLB.Type == capz.Internal {
+		return NetworkModePrivate
+	}
+
+	return NetworkModePublic
 }
 
 func (r *AzureClusterReconciler) setFinalizer(workloadCluster *capz.AzureCluster) {

@@ -48,7 +48,7 @@ const (
 
 	NetworkModePublic NetworkMode = iota
 	NetworkModePrivate
-	NetworkModeBYON
+	NetworkModeBYO
 )
 
 // Options holds optional configuration for AzureClusterReconciler.
@@ -266,8 +266,8 @@ func getNetworkMode(ac capz.AzureCluster) NetworkMode {
 			return NetworkModePublic
 		case "private":
 			return NetworkModePrivate
-		case "byon":
-			return NetworkModeBYON
+		case "byo":
+			return NetworkModeBYO
 		}
 	}
 

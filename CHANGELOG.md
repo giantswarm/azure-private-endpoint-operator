@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.0-rc.1] - 2026-09-16
 
+### Added
+
+- Detect cluster network mode from annotation.
+
 ## [0.7.0] - 2026-06-25
 
 ### Added

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-02
+
 ### Fixed
 
 - The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.
@@ -153,7 +155,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated Dockerfile
 
-[Unreleased]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.8.0-rc.1...v0.8.0
 [0.8.0-rc.1]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.7.0...v0.8.0-rc.1
 [0.7.0]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.6.0...v0.7.0

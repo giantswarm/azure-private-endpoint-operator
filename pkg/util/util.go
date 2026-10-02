@@ -5,25 +5,6 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
 )
 
-func ContainsPtr(slice []*string, str string) bool {
-	for _, v := range slice {
-		if v != nil && *v == str {
-			return true
-		}
-	}
-	return false
-}
-
-func ConvertToStringSlice(pointers []*string) []string {
-	result := make([]string, len(pointers))
-	for i, p := range pointers {
-		if p != nil {
-			result[i] = *p
-		}
-	}
-	return result
-}
-
 // FindUnmetStatusConditions asserts that the status of all given conditions is "True".
 // Any condition that is not listed in parameter 'gates' is ignored.
 // It returns a slice of unmet conditions for reporting.

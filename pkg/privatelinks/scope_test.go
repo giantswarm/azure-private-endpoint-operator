@@ -185,7 +185,7 @@ var _ = Describe("Scope", func() {
 				privateLinks := scope.GetPrivateLinksWithAllowedSubscription(subscriptionID)
 				Expect(privateLinks).To(HaveLen(1))
 				Expect(privateLinks[0].Name).To(Equal(privateLinkName))
-				Expect(privateLinks[0].AllowedSubscriptions).To(ConsistOf(&subscriptionID))
+				Expect(privateLinks[0].AllowedSubscriptions).To(ConsistOf(subscriptionID))
 			})
 
 			It("doesn't get a private link for the disallowed subscription ID", func() {
@@ -212,7 +212,7 @@ var _ = Describe("Scope", func() {
 				privateLinks := scope.GetPrivateLinksWithAllowedSubscription(subscriptionID)
 				Expect(privateLinks).To(HaveLen(1))
 				Expect(privateLinks[0].Name).To(Equal(privateLinkName))
-				Expect(privateLinks[0].AllowedSubscriptions).To(ConsistOf(&subscriptionID))
+				Expect(privateLinks[0].AllowedSubscriptions).To(ConsistOf(subscriptionID))
 			})
 		})
 	})

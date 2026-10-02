@@ -17,7 +17,6 @@ import (
 	"github.com/giantswarm/microerror"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/pkg/errors"
-	"github.com/giantswarm/azure-private-endpoint-operator/pkg/util"
 )
 
 const (
@@ -88,7 +87,7 @@ func (s *Service) ReconcileMcToWcApi(ctx context.Context) error {
 	//
 	for _, privateLink := range privateLinks {
 		logger.Info(fmt.Sprintf("Found private link %s", privateLink.Name))
-		manualApproval := !slices.Contains(util.ConvertToStringSlice(privateLink.AutoApprovedSubscriptions), s.privateEndpointsScope.GetSubscriptionID())
+		manualApproval := !slices.Contains(privateLink.AutoApprovedSubscriptions, s.privateEndpointsScope.GetSubscriptionID())
 		var requestMessage string
 		if manualApproval {
 			requestMessage = fmt.Sprintf("Giant Swarm azure-private-endpoint-operator that is running in "+

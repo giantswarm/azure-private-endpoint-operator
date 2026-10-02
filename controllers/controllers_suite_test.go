@@ -47,11 +47,14 @@ var _ = BeforeSuite(func() {
 	logger := zap.New(zap.UseFlagOptions(&opts))
 	log.SetLogger(logger)
 
-	// Look up packages on-disk so that we can load the CRDs.
-	capiModule, err := packages.Load(&packages.Config{Mode: packages.NeedModule}, "sigs.k8s.io/cluster-api")
+	// Look up packages on-disk so that we can load the CRDs. Packages are stored in `go env GOMODCACHE`.
+	// The cluster-api module root contains no Go files, so we load a package from the root module and use its module directory.
+	capiModule, err := packages.Load(&packages.Config{Mode: packages.NeedModule}, "sigs.k8s.io/cluster-api/core")
 	Expect(err).NotTo(HaveOccurred())
+	Expect(packages.PrintErrors(capiModule)).To(BeZero())
 	capzModule, err := packages.Load(&packages.Config{Mode: packages.NeedModule}, "sigs.k8s.io/cluster-api-provider-azure")
 	Expect(err).NotTo(HaveOccurred())
+	Expect(packages.PrintErrors(capzModule)).To(BeZero())
 
 	By("bootstrapping test environment")
 	kubeBuilderAssetsPath, err := envtest.SetupEnvtestDefaultBinaryAssetsDirectory()
@@ -68,7 +71,7 @@ var _ = BeforeSuite(func() {
 		Scheme: scheme,
 		CRDDirectoryPaths: []string{
 			// CAPI Core (Cluster, ...)
-			filepath.Join(capiModule[0].Module.Dir, "config", "crd", "bases"),
+			filepath.Join(capiModule[0].Module.Dir, "core", "config", "crd", "bases"),
 			// CAPI ControlPlane (KubeadmControlPlane, ...)
 			filepath.Join(capiModule[0].Module.Dir, "controlplane", "kubeadm", "config", "crd", "bases"),
 			// CAPZ Core (AzureCluster, ...)

@@ -7,6 +7,9 @@ formatters:
       local-prefixes:
         - github.com/giantswarm/azure-private-endpoint-operator
 linters:
+  enable:
+    - gosec
+    - goconst
   exclusions:
     rules:
       # CAPZ depends on CAPI v1beta1 until it adopts v1beta2.

@@ -189,7 +189,7 @@ func (r *ProviderConfigReconciler) reconcileNormal(ctx context.Context, cluster 
 	// TODO: Should there just be an owner reference and let the GC handle cleanup?
 	origCluster := cluster.DeepCopy()
 	if controllerutil.AddFinalizer(cluster, ProviderConfigControllerFinalizer) {
-		if err = r.client.Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
+		if err = r.client.Patch(ctx, cluster, client.MergeFromWithOptions(origCluster, client.MergeFromWithOptimisticLock{})); err != nil {
 			return
 		}
 	}
@@ -223,7 +223,7 @@ func (r *ProviderConfigReconciler) reconcileDelete(ctx context.Context, cluster 
 
 	origCluster := cluster.DeepCopy()
 	if controllerutil.RemoveFinalizer(cluster, ProviderConfigControllerFinalizer) {
-		if err = r.client.Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
+		if err = r.client.Patch(ctx, cluster, client.MergeFromWithOptions(origCluster, client.MergeFromWithOptimisticLock{})); err != nil {
 			return
 		}
 	}

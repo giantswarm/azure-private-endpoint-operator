@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Use optimistic locking when adding or removing the ProviderConfig finalizer on the Cluster, so a patch built from an outdated object fails with a conflict instead of overwriting other controllers' finalizers.
 - CI: push the image to the China registry from `sync-china-registry` (`split-china-push: true`).
 - Bump `golang.org/x/net` to v0.62.0 for CVE-2026-97045 and CVE-2026-78661, which fail the nancy scan.
 

@@ -5,11 +5,44 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	"github.com/giantswarm/azure-private-endpoint-operator/controllers"
 	. "github.com/giantswarm/azure-private-endpoint-operator/pkg/testhelpers"
 )
+
+const otherFinalizer = "other-operator.finalizers.giantswarm.io/test"
+
+// staleReadClient removes otherFinalizer from the Cluster right after the reconciler first reads
+// it, to simulate another controller changing the Cluster while the reconciler holds an outdated
+// copy.
+type staleReadClient struct {
+	client.Client
+	done bool
+}
+
+func (c *staleReadClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if err := c.Client.Get(ctx, key, obj, opts...); err != nil {
+		return err
+	}
+	if _, ok := obj.(*capi.Cluster); ok && !c.done {
+		c.done = true
+		latest := &capi.Cluster{}
+		Expect(c.Client.Get(ctx, key, latest)).To(Succeed())
+		var finalizers []string
+		for _, f := range latest.Finalizers {
+			if f != otherFinalizer {
+				finalizers = append(finalizers, f)
+			}
+		}
+		latest.Finalizers = finalizers
+		Expect(c.Client.Update(ctx, latest)).To(Succeed())
+	}
+	return nil
+}
 
 var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 	Describe("Constructor", func() {
@@ -67,6 +100,33 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 				"metadata.resourceVersion",
 				"metadata.uid",
 			}))
+		})
+
+		It("returns a conflict and does not add back a finalizer another controller removed after the Cluster was read", func(ctx context.Context) {
+			req := Request(namespace, "foo")
+
+			azureClusterIdentity := NewAzureClusterIdentityBuilder(namespace, "foo").
+				WithTenantID("123").
+				WithClientID("456").
+				Build()
+			azureCluster := NewAzureClusterBuilder(namespace, "foo").
+				WithIdentity(azureClusterIdentity).
+				Build()
+			cluster := NewClusterBuilder(namespace, "foo").
+				WithAzureCluster(azureCluster).
+				WithFinalizers(otherFinalizer).
+				Build()
+
+			CreateObjects(ctx, azureClusterIdentity, azureCluster, cluster)
+
+			r, err := controllers.NewProviderConfigReconciler(&staleReadClient{Client: k8sClient})
+			Expect(err).To(BeNil())
+
+			_, err = r.Reconcile(ctx, req)
+			Expect(apierrors.IsConflict(err)).To(BeTrue(), "expected a conflict, got %v", err)
+
+			GetObjects(ctx, cluster)
+			Expect(cluster.Finalizers).To(BeEmpty())
 		})
 
 		It("returns error when identityRef is unset", func(ctx context.Context) {
@@ -227,6 +287,33 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 
 			// The Cluster should be gone now, indicating that the finalizer was removed.
 			Eventually(Get(cluster)).ShouldNot(Succeed())
+		})
+
+		It("returns a conflict and does not add back a finalizer another controller removed after the Cluster was read", func(ctx context.Context) {
+			name := "stale-deleting-cluster"
+			req := Request(namespace, name)
+
+			cluster := NewClusterBuilder(namespace, req.Name).
+				WithFinalizers(controllers.ProviderConfigControllerFinalizer, otherFinalizer).
+				WithDummyReferences().
+				Build()
+
+			CreateObjects(ctx, cluster)
+			DeleteObjects(ctx, cluster)
+			Eventually(Get(cluster)).Should(Succeed())
+
+			r, err := controllers.NewProviderConfigReconciler(&staleReadClient{Client: k8sClient})
+			Expect(err).To(BeNil())
+
+			_, err = r.Reconcile(ctx, req)
+			Expect(apierrors.IsConflict(err)).To(BeTrue(), "expected a conflict, got %v", err)
+
+			GetObjects(ctx, cluster)
+			Expect(cluster.Finalizers).To(ConsistOf(controllers.ProviderConfigControllerFinalizer))
+
+			// Let the Cluster go.
+			cluster.Finalizers = nil
+			Expect(k8sClient.Update(ctx, cluster)).To(Succeed())
 		})
 	})
 })

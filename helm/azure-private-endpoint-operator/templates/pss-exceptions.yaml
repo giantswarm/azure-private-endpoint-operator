@@ -3,6 +3,11 @@ kind: PolicyException
 metadata:
   name: {{ include "resource.default.name"  . }}-exceptions
   namespace: {{ include "resource.default.namespace"  . }}
+  annotations:
+    # Create before the hostNetwork Deployment, or Kyverno denies it on install.
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    # The first upgrade to a hook would otherwise delete it as a removed release resource.
+    "helm.sh/resource-policy": keep
 spec:
   exceptions:
   - policyName: disallow-host-ports

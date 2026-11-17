@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Use optimistic locking when adding or removing the ProviderConfig finalizer on the Cluster, so a patch built from an outdated object fails with a conflict instead of overwriting other controllers' finalizers.
+
+## [0.8.2] - 2026-11-17
+
+### Fixed
+
+- Create the Kyverno `PolicyException` as a `pre-install,pre-upgrade` hook, so Kyverno no longer denies the `hostNetwork` Deployment on a fresh install. Skip it when the `kyverno.io/v2` API isn't served.
 - CI: push the image to the China registry from `sync-china-registry` (`split-china-push: true`).
 - Bump `golang.org/x/net` to v0.62.0 for CVE-2026-97045 and CVE-2026-78661, which fail the nancy scan.
 
@@ -161,7 +167,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated Dockerfile
 
-[Unreleased]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.8.0-rc.1...v0.8.0
 [0.8.0-rc.1]: https://github.com/giantswarm/azure-private-endpoint-operator/compare/v0.7.0...v0.8.0-rc.1

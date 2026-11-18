@@ -57,14 +57,19 @@ type Options struct{}
 // AzureClusterReconciler reconciles a AzureCluster object
 type AzureClusterReconciler struct {
 	client.Client
+	// apiReader reads from the API server instead of the cache, see removeFinalizer.
+	apiReader                     client.Reader
 	privateEndpointsClientCreator azure.PrivateEndpointsClientCreator
 	managementClusterName         types.NamespacedName
 	options                       Options
 }
 
-func NewAzureClusterReconciler(client client.Client, privateEndpointsClientCreator azure.PrivateEndpointsClientCreator, managementClusterName types.NamespacedName, options Options) (*AzureClusterReconciler, error) {
+func NewAzureClusterReconciler(client client.Client, apiReader client.Reader, privateEndpointsClientCreator azure.PrivateEndpointsClientCreator, managementClusterName types.NamespacedName, options Options) (*AzureClusterReconciler, error) {
 	if client == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "client must be set")
+	}
+	if apiReader == nil {
+		return nil, microerror.Maskf(errors.InvalidConfigError, "apiReader must be set")
 	}
 	if privateEndpointsClientCreator == nil {
 		return nil, microerror.Maskf(errors.InvalidConfigError, "privateEndpointsClientCreator must be set")
@@ -77,6 +82,7 @@ func NewAzureClusterReconciler(client client.Client, privateEndpointsClientCreat
 	}
 	return &AzureClusterReconciler{
 		Client:                        client,
+		apiReader:                     apiReader,
 		privateEndpointsClientCreator: privateEndpointsClientCreator,
 		managementClusterName:         managementClusterName,
 		options:                       options,
@@ -124,6 +130,24 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err = validateLBType(managementAzureCluster); err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
+
+	// Add the finalizer before anything is created in Azure, and before the scopes below create
+	// their patch helpers, so they start from the patched object. Finalizers are written with their
+	// own patch, see addFinalizer.
+	if workloadAzureCluster.DeletionTimestamp.IsZero() {
+		if err = r.addFinalizer(ctx, &workloadAzureCluster); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+	}
+
+	// The finalizer is removed only after the scopes have written the other changes to the
+	// AzureCluster, so this is deferred before the scopes' Close.
+	privateEndpointsDeleted := false
+	defer func() {
+		if privateEndpointsDeleted && err == nil {
+			err = r.removeFinalizer(ctx, &workloadAzureCluster)
+		}
+	}()
 
 	// Create WC private links scope - we use this to get the info about the private workload
 	// cluster private links, and then we make sure to have a private endpoints that connect to the
@@ -181,8 +205,6 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if workloadAzureCluster.DeletionTimestamp.IsZero() {
-		r.setFinalizer(&workloadAzureCluster)
-
 		if getNetworkMode(workloadAzureCluster) == NetworkModePrivate {
 			err = mcPrivateEndpointsService.ReconcileMcToWcApi(ctx)
 		}
@@ -212,7 +234,7 @@ func (r *AzureClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		r.removeFinalizer(&workloadAzureCluster)
+		privateEndpointsDeleted = true
 	}
 
 	return ctrl.Result{}, nil
@@ -278,16 +300,40 @@ func getNetworkMode(ac capz.AzureCluster) NetworkMode {
 	return NetworkModePublic
 }
 
-func (r *AzureClusterReconciler) setFinalizer(workloadCluster *capz.AzureCluster) {
-	if !controllerutil.ContainsFinalizer(workloadCluster, AzureClusterControllerFinalizer) {
-		controllerutil.AddFinalizer(workloadCluster, AzureClusterControllerFinalizer)
+// addFinalizer adds AzureClusterControllerFinalizer to workloadCluster with a merge patch that
+// only contains the finalizers and carries its resourceVersion. A merge patch replaces the whole
+// finalizers list, and other controllers put finalizers on the AzureCluster too, so without the
+// resourceVersion a patch built from an outdated object could add back a finalizer another
+// controller has removed. With it, the API server rejects an outdated patch with a 409 Conflict,
+// and the reconciliation is retried with the current object.
+//
+// The patch helpers of the scopes do not send a resourceVersion, which is why the finalizers are
+// not left to them.
+func (r *AzureClusterReconciler) addFinalizer(ctx context.Context, workloadCluster *capz.AzureCluster) error {
+	original := workloadCluster.DeepCopy()
+	if !controllerutil.AddFinalizer(workloadCluster, AzureClusterControllerFinalizer) {
+		return nil
 	}
+
+	return r.Patch(ctx, workloadCluster, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{}))
 }
 
-func (r *AzureClusterReconciler) removeFinalizer(workloadCluster *capz.AzureCluster) {
-	if controllerutil.ContainsFinalizer(workloadCluster, AzureClusterControllerFinalizer) {
-		controllerutil.RemoveFinalizer(workloadCluster, AzureClusterControllerFinalizer)
+// removeFinalizer removes AzureClusterControllerFinalizer with a merge patch that carries the
+// resourceVersion, see addFinalizer. It reads the AzureCluster from the API server, not from the
+// cache: the scopes' patch helpers patch copies of workloadCluster, so neither it nor the cache
+// has their write yet, and a patch based on either would conflict with it.
+func (r *AzureClusterReconciler) removeFinalizer(ctx context.Context, workloadCluster *capz.AzureCluster) error {
+	latest := &capz.AzureCluster{}
+	if err := r.apiReader.Get(ctx, client.ObjectKeyFromObject(workloadCluster), latest); err != nil {
+		return microerror.Mask(client.IgnoreNotFound(err))
 	}
+
+	original := latest.DeepCopy()
+	if !controllerutil.RemoveFinalizer(latest, AzureClusterControllerFinalizer) {
+		return nil
+	}
+
+	return microerror.Mask(r.Patch(ctx, latest, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{})))
 }
 
 // SetupWithManager sets up the controller with the Manager.

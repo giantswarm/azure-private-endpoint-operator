@@ -127,7 +127,7 @@ func main() {
 		Namespace: managementClusterNamespace,
 		Name:      managementClusterName,
 	}
-	azureClusterReconciler, err := controllers.NewAzureClusterReconciler(mgr.GetClient(), azure.NewPrivateEndpointClient, mcNamespacedName, controllers.Options{})
+	azureClusterReconciler, err := controllers.NewAzureClusterReconciler(mgr.GetClient(), mgr.GetAPIReader(), azure.NewPrivateEndpointClient, mcNamespacedName, controllers.Options{})
 	if err != nil {
 		setupLog.Error(err, "unable to create new AzureClusterReconciler")
 		os.Exit(1)

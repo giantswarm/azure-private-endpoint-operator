@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Look up the cluster identity of the Crossplane ProviderConfig in the namespace of the `identityRef`, falling back to the Cluster's namespace.
+
 ## [0.8.2] - 2026-11-17
 
 ### Fixed

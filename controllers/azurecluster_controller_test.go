@@ -34,6 +34,35 @@ const (
 	testPrivateEndpointIpForMcGateway = "10.10.10.12"
 )
 
+// staleAzureClusterReadClient removes otherFinalizer from the AzureCluster named key right after
+// the reconciler first reads it, to simulate another controller changing the AzureCluster while
+// the reconciler holds an outdated copy.
+type staleAzureClusterReadClient struct {
+	client.Client
+	key  types.NamespacedName
+	done bool
+}
+
+func (c *staleAzureClusterReadClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if err := c.Client.Get(ctx, key, obj, opts...); err != nil {
+		return err
+	}
+	if _, ok := obj.(*capz.AzureCluster); ok && key == c.key && !c.done {
+		c.done = true
+		latest := &capz.AzureCluster{}
+		Expect(c.Client.Get(ctx, key, latest)).To(Succeed())
+		var finalizers []string
+		for _, f := range latest.Finalizers {
+			if f != otherFinalizer {
+				finalizers = append(finalizers, f)
+			}
+		}
+		latest.Finalizers = finalizers
+		Expect(c.Client.Update(ctx, latest)).To(Succeed())
+	}
+	return nil
+}
+
 var _ = Describe("AzureClusterReconciler", func() {
 	var subscriptionID string
 	var location string
@@ -99,21 +128,27 @@ var _ = Describe("AzureClusterReconciler", func() {
 	Describe("creating reconciler", func() {
 		It("creates reconciler", func(ctx context.Context) {
 			var err error
-			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(reconciler).NotTo(BeNil())
 		})
 
 		It("fails to create reconciler when client is nil", func(ctx context.Context) {
 			var err error
-			_, err = controllers.NewAzureClusterReconciler(nil, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+			_, err = controllers.NewAzureClusterReconciler(nil, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsInvalidConfig(err)).To(BeTrue())
+		})
+
+		It("fails to create reconciler when API reader is nil", func(ctx context.Context) {
+			_, err := controllers.NewAzureClusterReconciler(k8sClient, nil, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalidConfig(err)).To(BeTrue())
 		})
 
 		It("fails to create reconciler when private endpoints creator is nil", func(ctx context.Context) {
 			var err error
-			_, err = controllers.NewAzureClusterReconciler(k8sClient, nil, managementClusterNamespacedName, controllers.Options{})
+			_, err = controllers.NewAzureClusterReconciler(k8sClient, k8sClient, nil, managementClusterNamespacedName, controllers.Options{})
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalidConfig(err)).To(BeTrue())
 		})
@@ -121,7 +156,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 		It("fails to create reconciler when MC name is empty", func(ctx context.Context) {
 			var err error
 			managementClusterNamespacedName.Name = ""
-			_, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+			_, err = controllers.NewAzureClusterReconciler(k8sClient, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalidConfig(err)).To(BeTrue())
 		})
@@ -129,7 +164,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 		It("fails to create reconciler when MC namespace is empty", func(ctx context.Context) {
 			var err error
 			managementClusterNamespacedName.Namespace = ""
-			_, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+			_, err = controllers.NewAzureClusterReconciler(k8sClient, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalidConfig(err)).To(BeTrue())
 		})
@@ -139,7 +174,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 		When("workload AzureCluster resources does not exist", func() {
 			JustBeforeEach(func() {
 				var err error
-				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -167,7 +202,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 			JustBeforeEach(func() {
 				var err error
-				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -201,7 +236,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 			JustBeforeEach(func() {
 				var err error
-				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -229,7 +264,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 			JustBeforeEach(func() {
 				var err error
-				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+				reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -296,7 +331,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		JustBeforeEach(func() {
 			var err error
-			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -315,6 +350,25 @@ var _ = Describe("AzureClusterReconciler", func() {
 			// finalizer has been set
 			Expect(workloadAzureCluster.Finalizers).To(HaveLen(1))
 			Expect(workloadAzureCluster.Finalizers[0]).To(Equal(controllers.AzureClusterControllerFinalizer))
+		})
+
+		When("another controller removes its finalizer after the AzureCluster was read", func() {
+			BeforeEach(func() {
+				workloadAzureCluster.Finalizers = []string{otherFinalizer}
+			})
+
+			It("returns a conflict and does not add the other finalizer back", func(ctx context.Context) {
+				staleClient := &staleAzureClusterReadClient{Client: k8sClient, key: workloadClusterNamespacedName}
+				reconciler, err := controllers.NewAzureClusterReconciler(staleClient, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = reconciler.Reconcile(ctx, workloadClusterRequest)
+				Expect(apierrors.IsConflict(err)).To(BeTrue(), "expected a conflict, got %v", err)
+
+				err = k8sClient.Get(ctx, workloadClusterNamespacedName, workloadAzureCluster)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(workloadAzureCluster.Finalizers).To(BeEmpty())
+			})
 		})
 
 		It("creates a new private endpoint for the private link", func(ctx context.Context) {
@@ -421,7 +475,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		JustBeforeEach(func() {
 			var err error
-			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -519,7 +573,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		JustBeforeEach(func() {
 			var err error
-			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -541,6 +595,26 @@ var _ = Describe("AzureClusterReconciler", func() {
 			// private endpoint in management cluster is deleted
 			Expect(managementAzureCluster.Spec.NetworkSpec.Subnets[0].PrivateEndpoints).To(HaveLen(0))
 		})
+
+		When("another controller removes its finalizer after the AzureCluster was read", func() {
+			BeforeEach(func() {
+				workloadAzureCluster.Finalizers = []string{controllers.AzureClusterControllerFinalizer, otherFinalizer}
+			})
+
+			It("removes its finalizer from the current AzureCluster", func(ctx context.Context) {
+				staleClient := &staleAzureClusterReadClient{Client: k8sClient, key: workloadClusterNamespacedName}
+				reconciler, err := controllers.NewAzureClusterReconciler(staleClient, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+				Expect(err).NotTo(HaveOccurred())
+
+				result, err := reconciler.Reconcile(ctx, workloadClusterRequest)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal(ctrl.Result{}))
+
+				// Both finalizers are gone, so the workload AzureCluster is deleted.
+				err = k8sClient.Get(ctx, workloadClusterNamespacedName, workloadAzureCluster)
+				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "expected NotFound, got %v", err)
+			})
+		})
 	})
 
 	Describe("scenarios where reconciliation is requeued after a minute", func() {
@@ -553,7 +627,7 @@ var _ = Describe("AzureClusterReconciler", func() {
 
 		JustBeforeEach(func() {
 			var err error
-			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
+			reconciler, err = controllers.NewAzureClusterReconciler(k8sClient, k8sClient, privateEndpointsClientCreator, managementClusterNamespacedName, controllers.Options{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 

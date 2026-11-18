@@ -1,9 +1,11 @@
-{{- if .Capabilities.APIVersions.Has "kyverno.io/v2/PolicyException" }}
+{{- if and (.Capabilities.APIVersions.Has "kyverno.io/v2/PolicyException") .Values.kyvernoPolicyExceptions.enabled .Values.kyvernoPolicyExceptions.legacy.enabled }}
 apiVersion: kyverno.io/v2
 kind: PolicyException
 metadata:
   name: {{ include "resource.default.name"  . }}-exceptions
   namespace: {{ include "resource.default.namespace"  . }}
+  labels:
+    policy.giantswarm.io/migrated-to-cel: "true"
   annotations:
     # Create before the hostNetwork Deployment, or Kyverno denies it on install.
     "helm.sh/hook": "pre-install,pre-upgrade"

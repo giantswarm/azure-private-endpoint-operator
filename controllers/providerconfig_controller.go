@@ -137,11 +137,18 @@ func (r *ProviderConfigReconciler) reconcileNormal(ctx context.Context, cluster 
 		return result, err
 	}
 
+	// The identity can live in another namespace than the Cluster: CAPZ allows that for an
+	// AzureClusterIdentity, with spec.allowedNamespaces.
+	identityNamespace := identityRef.Namespace
+	if identityNamespace == "" {
+		identityNamespace = cluster.Namespace
+	}
+
 	switch identityRef.Kind {
 	case capz.AzureClusterIdentityKind:
 		identity := new(capz.AzureClusterIdentity)
 		name := types.NamespacedName{
-			Namespace: cluster.Namespace,
+			Namespace: identityNamespace,
 			Name:      identityRef.Name,
 		}
 		err = r.client.Get(ctx, name, identity)
@@ -163,7 +170,7 @@ func (r *ProviderConfigReconciler) reconcileNormal(ctx context.Context, cluster 
 	case SecretIdentityKind:
 		secret := new(corev1.Secret)
 		name := types.NamespacedName{
-			Namespace: cluster.Namespace,
+			Namespace: identityNamespace,
 			Name:      identityRef.Name,
 		}
 		err = r.client.Get(ctx, name, secret)

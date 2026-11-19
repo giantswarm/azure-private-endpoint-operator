@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use optimistic locking when adding or removing the ProviderConfig finalizer on the Cluster, so a patch built from an outdated object fails with a conflict instead of overwriting other controllers' finalizers.
 - Do the same for the finalizer on the workload AzureCluster, which is now written with its own patch instead of by the scopes' patch helpers.
+- Look up the cluster identity of the Crossplane ProviderConfig in the namespace of the `identityRef`, falling back to the Cluster's namespace.
 
 ## [0.8.2] - 2026-11-17
 

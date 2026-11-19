@@ -5,7 +5,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -127,6 +129,39 @@ var _ = Describe("CrossplaneProviderConfigReconciler", func() {
 
 			GetObjects(ctx, cluster)
 			Expect(cluster.Finalizers).To(BeEmpty())
+		})
+
+		It("creates a ProviderConfig when the identity is in another namespace", func(ctx context.Context) {
+			req := Request(namespace, "foo")
+
+			identityNamespace := corev1.Namespace{}
+			identityNamespace.Name = string(uuid.NewUUID())
+			Expect(k8sClient.Create(ctx, &identityNamespace)).To(Succeed())
+			DeferCleanup(func(ctx context.Context) {
+				Expect(k8sClient.Delete(ctx, &identityNamespace)).To(Succeed())
+			})
+
+			azureClusterIdentity := NewAzureClusterIdentityBuilder(identityNamespace.Name, "cluster-identity").
+				WithTenantID("123").
+				WithClientID("456").
+				Build()
+			azureCluster := NewAzureClusterBuilder(namespace, "foo").
+				WithIdentity(azureClusterIdentity).
+				Build()
+			cluster := NewClusterBuilder(namespace, "foo").WithAzureCluster(azureCluster).Build()
+
+			CreateObjects(ctx, azureClusterIdentity, azureCluster, cluster)
+
+			r, err := controllers.NewProviderConfigReconciler(k8sClient)
+			Expect(err).To(BeNil())
+
+			_, err = r.Reconcile(ctx, req)
+			Expect(err).To(BeNil())
+
+			got := controllers.NewProviderConfig(req.Name)
+			Expect(k8sClient.Get(ctx, req.NamespacedName, got)).To(Succeed())
+			Expect(got.Object["spec"]).To(HaveKeyWithValue("clientID", azureClusterIdentity.Spec.ClientID))
+			Expect(got.Object["spec"]).To(HaveKeyWithValue("tenantID", azureClusterIdentity.Spec.TenantID))
 		})
 
 		It("returns error when identityRef is unset", func(ctx context.Context) {

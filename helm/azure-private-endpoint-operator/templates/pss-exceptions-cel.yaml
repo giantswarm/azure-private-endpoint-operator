@@ -3,7 +3,7 @@ apiVersion: policies.kyverno.io/v1
 kind: PolicyException
 metadata:
   name: {{ include "resource.default.name"  . }}-exceptions
-  namespace: {{ include "resource.default.namespace"  . }}
+  namespace: kube-system
   annotations:
     # Create before the hostNetwork Deployment, or Kyverno denies it on install.
     "helm.sh/hook": "pre-install,pre-upgrade"
